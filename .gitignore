@@ -62,6 +62,3 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
-
-architecture.md
-agents.md
