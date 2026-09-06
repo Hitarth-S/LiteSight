@@ -28,9 +28,20 @@ class DOMObserver {
         for (const mutation of mutationsList) {
             changes.push({
                 type: mutation.type,
-                target: mutation.target,
-                addedNodes: Array.from(mutation.addedNodes),
-                removedNodes: Array.from(mutation.removedNodes),
+                targetId: mutation.target.id || "unnamed_node",
+                addedNodes: Array.from(mutation.addedNodes).map(node => {
+                    if (node.nodeType === 1 && node.getBoundingClientRect) { // Element node
+                        const rect = node.getBoundingClientRect();
+                        return {
+                            tag: node.tagName,
+                            text: node.innerText?.trim().substring(0, 50) || "",
+                            x: rect.x + (rect.width / 2),
+                            y: rect.y + (rect.height / 2)
+                        };
+                    }
+                    return null;
+                }).filter(n => n !== null),
+                removedNodes: Array.from(mutation.removedNodes).length,
                 attributeName: mutation.attributeName,
                 oldValue: mutation.oldValue
             });

@@ -22,24 +22,23 @@ LiteSight is a local-first visual browser agent designed for constrained hardwar
    source venv/bin/activate
    ```
 
-3. Install the dependencies (ensure you have a lightweight headless engine like Lightpanda installed):
+3. Install the dependencies. To prevent disk quota issues and respect the hardware constraints (no GPU needed), we install the CPU-only version of PyTorch:
    ```bash
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
    pip install -r requirements.txt
    ```
-   *(Note: Add your specific dependencies to `requirements.txt` as they are finalized).*
 
 ## Usage
 
-LiteSight uses a dual-process architecture (Fast Executor and Slow Planner). To start the agent, run the orchestrator:
+LiteSight uses a dual-process architecture (Fast Executor and Slow Planner). To start the agent and view the execution flow, run the main entry point:
 
 ```bash
-python -m src.orchestrator.executor
+python main.py
 ```
 
-*(Note: Provide the target URL or domain context as an argument if supported by your entry point).*
+## Architecture Progress
 
-## Architecture Highlights
-
-- **Vision**: Uses foveated tokenization (`src/vision/foveation.py`) to extract high-res patches at interaction points while down-sampling the rest, preventing token explosion.
-- **State**: Uses a passive `MutationObserver` (`src/state/observer.js`) for non-blocking UI state diffing instead of polling full-page snapshots.
-- **Orchestration**: Splits tasks between a heavy LLM (Slow Planner) and a lightweight edge model (Fast Executor) inside `src/orchestrator/executor.py`.
+- **Vision (Implemented)**: PyTorch-based foveated tokenization (`src/vision/foveation.py`) successfully extracts high-res center patches and downsampled irregular grids, preventing token explosion.
+- **State (Implemented)**: Asynchronous `MutationObserver` (`src/state/observer.js`) tracks DOM changes and pushes them directly to the Python backend via Playwright-style function exposure.
+- **Browser (Implemented)**: Headless engine wrapper (`src/browser/engine.py`) using `lightpanda`, binding the JS context for zero-polling state diffing.
+- **Orchestration (WIP)**: The heavy LLM (Slow Planner) and lightweight edge model (Fast Executor) loops are structurally complete in `src/orchestrator/executor.py`, awaiting the final model integrations.

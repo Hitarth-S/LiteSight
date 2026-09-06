@@ -18,9 +18,9 @@ To eliminate token explosion, the visual module must abandon uniform grid patchi
 
     API Contract: The Fast Executor must pass a specific (x, y) coordinate (the foveation center) to the Vision API, which will return the compressed foveated token array rather than a standard 1080p image tensor.
 
-3. The State Layer: MutationObserver Diffing
+3. The State Layer: MutationObserver Diffing & Lightpanda Engine
 
-The agent must never capture back-to-back full-page DOM snapshots. The State Layer must rely exclusively on the browser's native MutationObserver Web API to monitor changes in a non-blocking manner.
+The agent must never capture back-to-back full-page DOM snapshots. The State Layer relies on the lightweight `lightpanda.AsyncBrowser()` to inject our native MutationObserver into the page context, monitoring changes in a non-blocking manner.
 
     Configuration: The observer must be configured to track childList (for added/removed nodes), attributes (for state changes like disabled or hidden), and characterData (for text modifications).
 
