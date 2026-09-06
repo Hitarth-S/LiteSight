@@ -1,40 +1,44 @@
-# src/browser/engine.py
 import torch
 from pathlib import Path
-
-# Note: Lightpanda API is typically compatible with standard Playwright-style async patterns
-import lightpanda
+from playwright.async_api import async_playwright
+import asyncio
 
 class BrowserEngine:
-    """Manages the connection to the lightweight AI-native browser."""
+    """Manages the connection to a headless/headed Playwright browser."""
     
     def __init__(self):
+        self.playwright = None
         self.browser = None
         self.page = None
         self.local_state_tree = {} # Maps elements to their (x, y) coordinates
         
     async def initialize(self):
         """Starts the engine and injects the MutationObserver state tracker."""
-        print("[BrowserEngine] Initializing Lightpanda AsyncBrowser...")
-        self.browser = lightpanda.AsyncBrowser()
-        # Note: Depending on Lightpanda's exact bidi/CDP implementation, 
-        # we may need to connect to a specific session here.
-        # self.page = await self.browser.new_session()
+        print("[BrowserEngine] Initializing Playwright (Headed Mode)...")
+        self.playwright = await async_playwright().start()
+        # Launching with headless=False so the user can watch the magic!
+        self.browser = await self.playwright.chromium.launch(headless=False)
+        self.page = await self.browser.new_page()
         
         # Inject our non-blocking state observer JS
         observer_path = Path(__file__).parent.parent / "state" / "observer.js"
         with open(observer_path, "r") as f:
             js_code = f.read()
         
-        # NOTE: Once self.page is fully wired to Lightpanda's BiDi session:
-        # await self.page.expose_function("_liteSightStateUpdate", self._handle_mutations)
-        # await self.page.evaluate(js_code)
+        # Expose the python callback so JS can push mutations straight into our local state tree
+        await self.page.expose_function("_liteSightStateUpdate", self._handle_mutations)
+        
+        # We use add_init_script so the observer binds immediately on every page load/navigation
+        await self.page.add_init_script(js_code)
+        
         print("[BrowserEngine] MutationObserver successfully injected and bound.")
         
     async def navigate(self, url: str):
         """Navigates to the domain and waits for initial load."""
         print(f"[BrowserEngine] Navigating to {url}")
         await self.page.goto(url)
+        # Give the JS observer a moment to batch and push the initial DOM mutations
+        await asyncio.sleep(2)
         
     async def get_current_image(self) -> torch.Tensor:
         """
@@ -58,6 +62,7 @@ class BrowserEngine:
         
         if action_type == "click":
             print(f"[BrowserEngine] Clicking target: {target}")
+            # If target is coordinates, we can do self.page.mouse.click(x, y)
             # await self.page.click(target)
         elif action_type == "type":
             print(f"[BrowserEngine] Typing into target: {target}")

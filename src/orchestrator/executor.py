@@ -23,12 +23,18 @@ class ReactiveExecutor:
         
         # Initialize the Lightweight Edge Model (e.g., a tiny VLM)
         try:
-            from transformers import AutoProcessor, AutoModel
-            print("[Executor] Loading lightweight local edge model into RAM...")
-            # Using a placeholder model ID for the local constrained model
-            self.processor = AutoProcessor.from_pretrained("HuggingFaceM4/tiny-random-LlamaForCausalLM")
-            self.model = AutoModel.from_pretrained("HuggingFaceM4/tiny-random-LlamaForCausalLM")
+            from transformers import AutoModelForCausalLM
+            import torch
+            print("[Executor] Loading Moondream2 (Real Multimodal Edge Model) into RAM... (This might take a minute)")
+            # Using Moondream2 as it is exceptionally small (~1.8B) and capable of screen coordinate grounding.
+            self.model = AutoModelForCausalLM.from_pretrained(
+                "vikhyatk/moondream2", 
+                revision="2024-05-08",
+                trust_remote_code=True,
+                torch_dtype=torch.float32 # Forces fp32 for maximum compatibility on 7th-gen Intel CPUs
+            )
             self.model_loaded = True
+            print("[Executor] Edge Model loaded successfully.")
         except Exception as e:
             print(f"[Executor] Could not load edge model (using fallback): {e}")
             self.model_loaded = False
