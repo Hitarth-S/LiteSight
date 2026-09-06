@@ -127,25 +127,24 @@ class HighLevelPlanner:
 
         prompt = f"""
         You are the high-level planner for an autonomous web agent.
-        Given the domain context, generate a JSON array of step-by-step subgoals.
+        Given the domain context, generate a JSON object containing step-by-step subgoals.
         Context: {json.dumps(domain_context)}
         
-        Respond ONLY with a valid JSON array of strings.
-        Example: ["click_search", "type_query", "submit"]
+        Respond ONLY with a valid JSON object containing a 'plan' array of strings.
+        Example: {{"plan": ["click_search", "type_query", "submit"]}}
         """
         
         try:
             print("[Planner] Querying Groq Heavy LLM for new strategic plan...")
             response = await self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile", # Updated to the latest active Llama 3.3 70B model
+                model="qwen/qwen3.8-27b", # Using the highly efficient Qwen 27B model on Groq
                 messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"} # Requires valid JSON
+                response_format={"type": "json_object"}, # Requires valid JSON object
+                max_tokens=256 # Prevents hitting Groq's strict free-tier output limits
             )
             content = response.choices[0].message.content
-            # The prompt asks for an array, but json_object requires an object.
-            # So we parse it assuming the model returned {"plan": [...]}.
-            data = json.loads(content)
-            return data.get("plan", ["fallback_goal"])
+            plan_obj = json.loads(content)
+            return plan_obj.get("plan", [])
         except Exception as e:
             print(f"[Planner] LLM Planning failed: {e}")
             return ["fallback_goal"]
