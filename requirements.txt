@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # Headless Browser Engine (Lightweight, AI-native)
 lightpanda>=0.1.0
 
