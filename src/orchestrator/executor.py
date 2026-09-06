@@ -137,7 +137,7 @@ class HighLevelPlanner:
         try:
             print("[Planner] Querying Groq Heavy LLM for new strategic plan...")
             response = await self.client.chat.completions.create(
-                model="llama3-70b-8192", # Using Groq's fast Llama 3 70B model
+                model="llama-3.1-70b-versatile", # Updated to the latest active Llama 3.1 70B model
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"} # Requires valid JSON
             )
