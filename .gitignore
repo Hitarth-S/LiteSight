@@ -1,0 +1,67 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments & Dependencies
+.venv/
+venv/
+ENV/
+env/
+node_modules/
+package-lock.json
+
+# Large AI Model Weights & Checkpoints (Crucial for VRAM/edge agents)
+*.bin
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.gguf
+*.ggml
+models/
+checkpoints/
+weights/
+
+# Vision & Agent Cache Artifacts
+screenshots/
+crops/
+recordings/
+traces/
+*.png
+*.jpg
+*.jpeg
+*.webp
+!assets/*.png
+!assets/*.jpg
+
+# Browser Engine & Headless Dumps (Playwright / Puppeteer / Lightpanda)
+.playwright/
+.cache/
+test-results/
+blob-report/
+playwright-report/
+
+# Secrets & Environment Configurations
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS & IDE Specifics
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build & Distribution outputs
+build/
+dist/
+*.egg-info/
+
+architecture.md
+agents.md

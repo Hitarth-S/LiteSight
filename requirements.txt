@@ -1,0 +1,12 @@
+# Headless Browser Engine (Lightweight, AI-native)
+lightpanda>=0.1.0
+
+# Vision and Tensor manipulation (Foveated tokenization)
+numpy>=1.24.0
+Pillow>=10.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# LLM integration (Slow Planner / Fast Edge)
+transformers>=4.30.0
+openai>=1.0.0
