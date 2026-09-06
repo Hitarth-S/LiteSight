@@ -100,23 +100,19 @@ class ReactiveExecutor:
             
         return {"type": "click", "target": "model_inferred_target"}
 
-    def apply_mutations(self, mutations: List[Dict[str, Any]]):
-        """
-        Reconciliation: Updates local, lightweight state tree using mutation records.
-        Eliminates the need for redundant DOM parsing.
-        """
-        for mutation in mutations:
-            # Reconcile self.local_state_tree
-            pass
-
 class HighLevelPlanner:
     """The Heavy LLM (Slow Planner)."""
     def __init__(self):
-        # Initializes the OpenAI client. Relies on OPENAI_API_KEY env variable.
+        # Initializes the OpenAI client to securely point to the Groq API
         try:
             import openai
-            self.client = openai.AsyncOpenAI()
-            self.enabled = True
+            import os
+            api_key = os.environ.get("GROQ_API_KEY")
+            self.client = openai.AsyncOpenAI(
+                api_key=api_key,
+                base_url="https://api.groq.com/openai/v1"
+            )
+            self.enabled = bool(api_key)
         except Exception:
             self.enabled = False
 
@@ -126,7 +122,7 @@ class HighLevelPlanner:
         Only runs initially or on Executor failure.
         """
         if not self.enabled:
-            print("[Planner] Warning: OpenAI client not configured. Using fallback plan.")
+            print("[Planner] Warning: GROQ_API_KEY not configured. Using fallback plan.")
             return ["locate_login", "enter_credentials", "verify_2fa"]
 
         prompt = f"""
@@ -139,9 +135,9 @@ class HighLevelPlanner:
         """
         
         try:
-            print("[Planner] Querying Heavy LLM for new strategic plan...")
+            print("[Planner] Querying Groq Heavy LLM for new strategic plan...")
             response = await self.client.chat.completions.create(
-                model="gpt-4o", # Using a heavy reasoning model
+                model="llama3-70b-8192", # Using Groq's fast Llama 3 70B model
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"} # Requires valid JSON
             )
