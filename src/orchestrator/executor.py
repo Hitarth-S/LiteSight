@@ -23,15 +23,24 @@ class ReactiveExecutor:
         
         # Initialize the Lightweight Edge Model (e.g., a tiny VLM)
         try:
-            from transformers import AutoProcessor, AutoModelForImageTextToText
+            from transformers import AutoProcessor, AutoModelForImageTextToText, BitsAndBytesConfig
             import torch
             print("[Executor] Loading SmolVLM (Ultra-light Multimodal Edge Model) into RAM...")
             # We use SmolVLM-256M as it is incredibly small (< 1GB), perfectly suited for 7th-gen CPUs, 
             # and fully native to transformers, completely eliminating 'trust_remote_code' breakage.
             self.processor = AutoProcessor.from_pretrained("HuggingFaceTB/SmolVLM-256M-Instruct")
+            
+            # PHASE 3 ROADMAP: 4-bit Quantization via bitsandbytes
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float32, # CPU compatibility
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4"
+            )
+            
             self.model = AutoModelForImageTextToText.from_pretrained(
                 "HuggingFaceTB/SmolVLM-256M-Instruct",
-                torch_dtype=torch.float32 # Forces fp32 for maximum compatibility on older Intel CPUs
+                quantization_config=bnb_config
             )
             self.model_loaded = True
             print("[Executor] Edge Model loaded successfully.")
