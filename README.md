@@ -36,8 +36,15 @@ LiteSight is actively evolving based on cutting-edge academic research regarding
 
 ## Architecture Progress
 
-- **Vision (WIP)**: Migrating from random noise tensors to a real, small-scale Multimodal Edge Model (like Moondream2) capable of true spatial coordinate inference.
+- **Vision (Implemented)**: Successfully migrated to **SmolVLM-256M-Instruct**, running locally in **4-bit NF4 Quantization** via `bitsandbytes`, keeping RAM usage strictly under 500MB on edge devices.
 - **State (Implemented)**: An asynchronous `MutationObserver` (`src/state/observer.js`) tracks DOM changes and pushes absolute spatial coordinates directly to the Python backend via Playwright-style function exposure.
-- **Browser (WIP)**: Migrating the headless wrapper (`src/browser/engine.py`) from Lightpanda stubs to a true Playwright-headed browser instance so actions can be visualized.
-- **Privacy (Implemented)**: The `StateSanitizer` module scrubs all Personally Identifiable Information (PII) from the local state tree before transmitting context to the cloud.
-- **Orchestration (Implemented)**: The dual-process loop (`src/orchestrator/executor.py`) is fully functional. The Slow Planner connects to Groq's high-speed API (Qwen 3.8-27b) for strategic planning, while the Fast Executor relies on local HuggingFace `transformers` models for spatial grounding and muscle-memory execution.
+- **Browser (Implemented)**: Migrated to a true **Playwright headed browser instance**, allowing full visual observation of the agent's actions on real web pages.
+- **Privacy & Personalization (Implemented)**: 
+  - **StateSanitizer**: Scrubs all Personally Identifiable Information (PII) before cloud transmission.
+  - **Retrieval-Augmented Personalization (RAP)**: Injects local user preferences (e.g., dark mode, cookie rejection) into context dynamically without uploading data.
+- **Orchestration (Implemented)**: The dual-process loop (`src/orchestrator/executor.py`) is fully functional with advanced memory management:
+  - **Cloud Planner**: Qwen 3.8-27b (via Groq API) for high-level logic.
+  - **Edge Executor**: Local SmolVLM for spatial grounding and muscle-memory UI execution.
+  - **Context State Objects (CSO)**: Compresses raw DOM history into dense key-value checklists to prevent memory bloat.
+  - **Just-In-Time (JIT) Tooling**: Dynamically injects function schemas only when needed to optimize prompt size and inference latency.
+  - **Nightly LoRA Scheduler**: Logs successful trajectories daily and queues them for off-peak parameter-efficient fine-tuning on the local device.
