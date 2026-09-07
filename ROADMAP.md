@@ -21,3 +21,10 @@ This roadmap outlines the strategic optimization path for LiteSight, heavily ins
 
 - [x] **4-bit AWQ / GPTQ Quantization**: Compress the SmolVLM-256M weights from `fp32` to 4-bit, dropping RAM usage from ~1GB to ~300MB while preserving reasoning capabilities via activation-aware quantization.
 - [x] **Collaborative Sharding**: Implement dynamic routing to split inference chunks between the local edge model and the cloud planner for tasks of intermediate complexity.
+
+## Phase 4: Future Outlook (LiteSight 2.0)
+*Objective: Push the boundaries of on-device autonomy, privacy, and architectural resilience.*
+
+- [ ] **Pure Visual Inference (Zero-DOM Dependency)**: Transitioning from a Hybrid (DOM+Vision) approach to 100% pixel-to-coordinate mapping (similar to OmniParser). This eliminates reliance on the DOM entirely, making the agent immune to anti-bot obfuscation, dynamic React virtual DOMs, and opaque `<canvas>` elements.
+- [ ] **Privacy-Preserving Federated Learning**: While the current Nightly LoRA scheduler learns locally, the next step is securely sharing these learned workflow "weights" across thousands of LiteSight devices using Differential Privacy. This creates a globally smarter agent without ever transmitting a single pixel of personal user data.
+- [ ] **Local Multi-Agent Swarms**: Deconstructing the monolithic edge model into a local network of specialized "Micro-Agents" (e.g., a 100M parameter model strictly for CAPTCHA solving, another for tabular data extraction). These micro-agents will communicate via a local message bus, significantly reducing power consumption and inference time compared to generalized models.
