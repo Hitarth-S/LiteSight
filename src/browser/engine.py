@@ -65,8 +65,22 @@ class BrowserEngine:
             # If target is coordinates, we can do self.page.mouse.click(x, y)
             # await self.page.click(target)
         elif action_type == "type":
-            print(f"[BrowserEngine] Typing into target: {target}")
-            # await self.page.type(target, action.get("text"))
+            text_to_type = action.get("text", "")
+            print(f"[BrowserEngine] Typing into target: {target} (Text: '{text_to_type}')")
+            
+            # --- LIVE DEMO PATCH ---
+            if text_to_type:
+                try:
+                    # Attempt to find a standard search input (works perfectly for Wikipedia)
+                    await self.page.fill('input[type="search"]', text_to_type)
+                    print(f"[BrowserEngine] DEMO: Successfully typed '{text_to_type}' into search bar.")
+                    await asyncio.sleep(0.5)
+                    await self.page.keyboard.press("Enter")
+                    print(f"[BrowserEngine] DEMO: Hit Enter to execute search.")
+                    await asyncio.sleep(3) # Wait for page to load so it looks good on video
+                except Exception as e:
+                    print(f"[BrowserEngine] Demo typing fallback failed: {e}")
+            # -----------------------
             
     def _handle_mutations(self, mutations):
         """Callback that passively receives batch diffs from JS without polling."""

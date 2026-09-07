@@ -3,6 +3,9 @@ import json
 from typing import List, Dict, Any, Optional
 from ..vision.foveation import FoveatedTokenizer
 from ..state.sanitizer import StateSanitizer
+from ..state.cso_tracker import CSOTracker
+from ..state.personalization import RetrievalAugmentedPersonalization
+from .scheduler import NightlyLoRAScheduler
 
 # Specific error states for Planner handoff
 class ElementObscuredError(Exception):
@@ -142,7 +145,13 @@ class ReactiveExecutor:
         except Exception as e:
             print(f"[Executor] Inference parsing warning: {e}")
             
-        return {"type": selected_tool, "target": "model_inferred_target"}
+        action_dict = {"type": selected_tool, "target": "model_inferred_target"}
+        if selected_tool == "type":
+            import re
+            match = re.search(r"'([^']+)'", subgoal)
+            action_dict["text"] = match.group(1) if match else "Demo Text"
+            
+        return action_dict
 
 class HighLevelPlanner:
     """The Heavy LLM (Slow Planner)."""
@@ -199,13 +208,28 @@ class Orchestrator:
         self.planner = HighLevelPlanner()
         self.executor = ReactiveExecutor(vision_api, browser_api)
         self.sanitizer = StateSanitizer()
+        self.cso_tracker = CSOTracker()
+        self.personalization = RetrievalAugmentedPersonalization()
+        self.scheduler = NightlyLoRAScheduler()
         self.current_plan = []
 
     async def run(self, start_url: str, initial_goal: str = None):
+        # Retrieve personalized preferences dynamically for this URL via RAP
+        prefs = self.personalization.retrieve_preferences(start_url)
+        if prefs:
+            print(f"[Orchestrator] RAP: Injected {len(prefs)} local preferences into context.")
+            
         # The Slow Planner
         # Sanitize the local state tree to scrub PII before passing to cloud Planner
         safe_state = self.sanitizer.sanitize_state(self.executor.local_state_tree)
-        context = {"url": start_url, "state": safe_state}
+        compressed_cso = self.cso_tracker.get_compressed_context()
+        
+        context = {
+            "url": start_url, 
+            "state": safe_state, 
+            "cso_memory": compressed_cso, 
+            "preferences": prefs
+        }
         
         if initial_goal:
             print(f"[Orchestrator] Using explicit CLI goal: {initial_goal}")
@@ -220,8 +244,14 @@ class Orchestrator:
             # The Fast Executor
             try:
                 success = await self.executor.execute_subgoal(subgoal)
+                if success:
+                    # Update append-only CSO tracking memory
+                    self.cso_tracker.append_state(subgoal, ["action_executed"])
+                    # Log successful trace for nightly learning
+                    self.scheduler.log_successful_trajectory({"goal": subgoal, "url": start_url})
             except (ElementObscuredError, StaleNodeException, DOMEmptyError) as e:
                 # The Handoff
+                self.cso_tracker.append_state(subgoal, [], current_blocker=str(e))
                 await self._handle_failure(e, context)
             
             if not success:
@@ -231,4 +261,5 @@ class Orchestrator:
     async def _handle_failure(self, error: Exception, context: Dict[str, Any]):
         """Wakes up the slow planner to reassess based on specific error states."""
         context["error_state"] = str(error)
+        context["cso_memory"] = self.cso_tracker.get_compressed_context()
         self.current_plan = await self.planner.plan(context)
