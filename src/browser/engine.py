@@ -46,7 +46,7 @@ class BrowserEngine:
         (Channels, Height, Width) for the FoveatedTokenizer.
         """
         if self.page:
-            screenshot_bytes = await self.page.screenshot(format="jpeg")
+            screenshot_bytes = await self.page.screenshot(type="jpeg")
         
         # In a real environment, we'd use PIL and torchvision to decode the bytes:
         # image = Image.open(io.BytesIO(screenshot_bytes))

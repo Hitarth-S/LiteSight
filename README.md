@@ -30,6 +30,10 @@ If you wish to bypass the cloud-based Slow Planner and test the local Edge Model
 python main.py --url https://github.com --goal "click_login_button"
 ```
 
+## Technical Roadmap & Optimizations
+
+LiteSight is actively evolving based on cutting-edge academic research regarding on-device AI and context management. Please see our [ROADMAP.md](ROADMAP.md) for detailed plans regarding Just-In-Time schema passing, Context State Objects (CSO), and nightly on-device fine-tuning.
+
 ## Architecture Progress
 
 - **Vision (WIP)**: Migrating from random noise tensors to a real, small-scale Multimodal Edge Model (like Moondream2) capable of true spatial coordinate inference.
