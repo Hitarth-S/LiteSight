@@ -1,30 +1,60 @@
-# LiteSight Technical Roadmap
+# LiteSight Active Engineering Roadmap (Build Tasks)
 
-This roadmap outlines the strategic optimization path for LiteSight, heavily inspired by cutting-edge academic research on on-device LLMs, adaptive context management, and edge-cloud synergy.
+This roadmap tracks the remaining build deliverables required to transition LiteSight from a local-VLM prototype into a privacy-first, fast-path browser agent.
 
-## Phase 1: Adaptive Context Management
-*Objective: Eliminate context bloat and O(n) memory growth during continuous browser execution.*
+## Phase 1: Fast-Path DOM Indexer & Speculative Engine
 
-- [x] **Mathematical Foveation**: PyTorch-based vision splitting to avoid full-frame token explosion.
-- [x] **Just-In-Time (JIT) Schema Passing**: Instead of loading the full API schema of all tools, the agent receives a concise "Tool Bank". Full schemas are only injected *after* the agent selects a tool.
-- [x] **Context State Objects (CSO)**: Implement a secondary distillation process that compresses raw, verbose DOM history into a dense, append-only Key-Value checklist (e.g., `user_goal: login, status: waiting_for_auth`).
-- [x] **KV Cache Pruning**: Separate context into `Permanent` (CSO) and `Ephemeral` (verbose HTML). Evict ephemeral tokens from the KV cache after every turn to maintain a flat memory footprint.
+Objective: Build sub-500ms DOM-based navigation to handle 90% of routine web interactions without running heavy local vision passes.
 
-## Phase 2: On-Device Personalization & Autonomy
-*Objective: Enable the agent to learn user habits securely on-device without cloud reliance.*
+* [ ] **Native JS DOM Indexing Snapshot Parser (`src/state/snapshot.js`)**:
+* Build atomic snapshot engine that assigns discrete integer keys to interactable DOM nodes (`[1] button`, `[2] combobox`, `[3] textbox`).
 
-- [x] **Retrieval-Augmented Personalization (RAP)**: Build a lightweight local Vector Database (e.g., FAISS/Chroma) to store user preferences and browser habits, retrieving them dynamically during execution.
-- [x] **Nightly LoRA Fine-Tuning**: Implement a local scheduler to perform parameter-efficient fine-tuning (LoRA) on the edge model during off-peak hours using the day's successful trajectories.
+* Extract observed node labels, current values, and ARIA attributes in a single browser protocol call.
 
-## Phase 3: Hardware Acceleration
-*Objective: Maximize computational throughput on strictly constrained edge devices (e.g., 7th-Gen Intel i5, 12GB RAM).*
+* [ ] **Decoupled Cloud Speculative Policy API**:
+* Implement single-request action resolver on the server returning combined `Operation + Target Index` JSON payloads (`{"op": "CLICK", "target": 4}`).
 
-- [x] **4-bit AWQ / GPTQ Quantization**: Compress the SmolVLM-256M weights from `fp32` to 4-bit, dropping RAM usage from ~1GB to ~300MB while preserving reasoning capabilities via activation-aware quantization.
-- [x] **Collaborative Sharding**: Implement dynamic routing to split inference chunks between the local edge model and the cloud planner for tasks of intermediate complexity.
+* Implement speculative target filtering to ensure click actions only accept compatible element types.
+
+* [ ] **Client Action Execution Guard**:
+* Build pre-execution validation layer that re-checks node freshness, element visibility, and click occlusion before dispatching events.
+
+## Phase 2: On-Device WebGPU Synthetic Privacy Kernel
+
+Objective: Implement local visual PII detection and context-preserving synthetic masking to satisfy 40% of the SIH evaluation rubric.
+
+* [ ] **WebGPU Visual PII Detector (`src/privacy/detector.js`)**:
+* Port and run an INT8 quantized YOLOv8-Nano object detection model on WebGPU to detect faces, credit cards, and government IDs in real-time.
+
+* Integrate a WebAssembly OCR engine (Tesseract.js / PaddleOCR Wasm) to parse text-based PII across non-DOM/Canvas regions.
+
+* [ ] **Context-Preserving Synthetic Masker (`src/privacy/canvas_masker.js`)**:
+* Build HTML5 Canvas overlay engine that visually replaces detected PII bounding boxes with stylized synthetic vector graphics (`[SYNTHETIC_CARD]`, standard avatar glyphs).
+
+* Ensure sanitized frames maintain exact UI element boundaries and context before transmitting images to the cloud VLM.
+
+* [ ] **Dual-Pane Live Sanitization Inspector UI**:
+* Build a browser extension side-by-side overlay showing the live raw webpage on the left and the sanitized frame + indexed DOM JSON received by the server on the right.
+
+## Phase 3: Foveated Visual Fallback Engine Integration
+
+Objective: Connect the existing local SmolVLM-256M model strictly as a fallback engine for non-DOM elements.
+
+* [ ] **Non-DOM Target Router**:
+* Implement detection filter that flags `<canvas>`, WebGL, SVG charts, or cross-origin iframes and diverts execution from the fast-path indexer to the local visual fallback.
+
+* [ ] **Mathematical Foveation Adapter (`src/vision/foveation.py`)**:
+* Connect PyTorch foveation module to extract high-resolution crop patches around targeted non-DOM regions while heavily downsampling surrounding context.
+
+* [ ] **Visual Coordinate Mapper**:
+* Map local SmolVLM bounding-box predictions directly to absolute Playwright viewport click coordinates.
 
 ## Phase 4: Future Outlook (LiteSight 2.0)
-*Objective: Push the boundaries of on-device autonomy, privacy, and architectural resilience.*
 
-- [ ] **Pure Visual Inference (Zero-DOM Dependency)**: Transitioning from a Hybrid (DOM+Vision) approach to 100% pixel-to-coordinate mapping (similar to OmniParser). This eliminates reliance on the DOM entirely, making the agent immune to anti-bot obfuscation, dynamic React virtual DOMs, and opaque `<canvas>` elements.
-- [ ] **Privacy-Preserving Federated Learning**: While the current Nightly LoRA scheduler learns locally, the next step is securely sharing these learned workflow "weights" across thousands of LiteSight devices using Differential Privacy. This creates a globally smarter agent without ever transmitting a single pixel of personal user data.
-- [ ] **Local Multi-Agent Swarms**: Deconstructing the monolithic edge model into a local network of specialized "Micro-Agents" (e.g., a 100M parameter model strictly for CAPTCHA solving, another for tabular data extraction). These micro-agents will communicate via a local message bus, significantly reducing power consumption and inference time compared to generalized models.
+Objective: Post-hackathon scaling, privacy-preserving federated learning, and multi-agent execution.
+
+* [ ] **Pure Visual Inference (Zero-DOM Dependency)**: Transitioning from a Hybrid (DOM+Vision) approach to 100% pixel-to-coordinate mapping (similar to OmniParser).
+
+* [ ] **Privacy-Preserving Federated Learning**: Securely sharing learned workflow LoRA weights across devices using Differential Privacy.
+
+* [ ] **Local Multi-Agent Swarms**: Deconstructing the monolithic edge model into specialized micro-agents communicating over a local message bus.

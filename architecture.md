@@ -27,3 +27,96 @@ The agent must never capture back-to-back full-page DOM snapshots. The State Lay
     Batch Processing: Instead of polling the DOM for changes, the agent must passively listen for the callback function, which will receive an array of MutationRecord objects detailing only what changed since the last action.
 
     Reconciliation: The execution loop updates a local, lightweight state tree using these mutation records, ensuring the agent always acts on the current UI state with zero redundant parsing overhead.
+
+    ## 7. AI Agent Implementation Contracts & Machine Specs
+
+> **Note for AI Coding Agents:** When implementing or refactoring modules in this repository, you MUST adhere strictly to the file paths, JSON schemas, and exception classes defined below. Do not create unmapped helper files or change payload key names.
+
+### A. Code Base File Structure & Responsibility Map
+
+| Module Path | Primary Responsibility | Input Type | Output Type |
+| :--- | :--- | :--- | :--- |
+| `src/privacy/detector.js` | WebGPU YOLOv8 + Wasm OCR execution | `HTMLVideoElement` / `ImageBitmap` | `Array<PIIBoundingBox>` |
+| `src/privacy/canvas_masker.js` | Canvas synthetic SVG vector overlay | `ImageBitmap`, `Array<PIIBoundingBox>` | `Blob` (PNG/WebP Frame) |
+| `src/state/snapshot.js` | Fast-path indexed DOM tree extractor | `Document` / `DOM Node` | `IndexedDOMState` (JSON) |
+| `src/state/observer.js` | Asynchronous MutationObserver listener | DOM Mutation Events | `MutationRecord` stream |
+| `src/vision/foveation.py` | PyTorch irregular grid foveation crop | `Tensor` (Full Image), `TargetCoord` | `Tensor` (Compressed Tokens) |
+| `src/orchestrator/executor.py` | Fast/Slow process action loop & guard | `IndexedDOMState`, `GoalString` | `ActionPayload` |
+
+---
+
+### B. Machine Schemas & Type Contracts
+
+#### 1. Fast-Path Indexed DOM State Schema (`src/state/snapshot.js`)
+AI agents generating snapshot code must emit JSON strictly matching this schema:
+```json
+{
+  "$schema": "[http://json-schema.org/draft-07/schema#](http://json-schema.org/draft-07/schema#)",
+  "type": "object",
+  "properties": {
+    "timestamp": { "type": "number" },
+    "url": { "type": "string" },
+    "elements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "index": { "type": "integer" },
+          "tag": { "type": "string" },
+          "role": { "type": "string" },
+          "label": { "type": "string" },
+          "value": { "type": "string" },
+          "is_visible": { "type": "boolean" },
+          "bounding_box": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            },
+            "required": ["x", "y", "width", "height"]
+          }
+        },
+        "required": ["index", "tag", "is_visible", "bounding_box"]
+      }
+    }
+  },
+  "required": ["timestamp", "url", "elements"]
+}
+
+2. Server Action Response Schema (src/orchestrator/executor.py)
+AI agents building server-side models must format responses strictly as:
+JSON
+{
+ "$schema": "[http://json-schema.org/draft-07/schema#](http://json-schema.org/draft-07/schema#)",
+ "type": "object",
+ "properties": {
+ "operation": {
+ "type": "string",
+ "enum": ["CLICK", "TYPE_TEXT", "SELECT", "SCROLL_UP", "SCROLL_DOWN", "WAIT", "FALLBACK_TO_VISION", "DONE"]
+ },
+ "target_index": { "type": ["integer", "null"] },
+ "text_value": { "type": ["string", "null"] },
+ "reasoning_summary": { "type": "string" }
+ },
+ "required": ["operation", "target_index"]
+}
+C. Required Exceptions & Error Handling Class Hierarchy
+AI agents MUST import and raise these exact custom exception classes located in src/orchestrator/exceptions.py:
+Python
+class LiteSightBaseException(Exception):
+ """Base exception for all LiteSight runtime errors."""
+ pass
+class StaleNodeException(LiteSightBaseException):
+ """Raised when target_index is no longer present in current DOM tree."""
+ pass
+class ElementObscuredError(LiteSightBaseException):
+ """Raised when target element is covered by overlay/modal or zero-width."""
+ pass
+class CanvasFallbackTrigger(LiteSightBaseException):
+ """Raised when action target resides within non-indexed <canvas> or WebGL context."""
+ pass
+class PIIRedactionFailure(LiteSightBaseException):
+ """Raised if WebGPU privacy kernel fails frame sanitization prior to egress."""
+ pass
