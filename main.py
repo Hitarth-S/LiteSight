@@ -29,8 +29,9 @@ async def run_agent(target_url: str, initial_goal: str = None):
     
     await orchestrator.run(target_url, initial_goal)
     
-    print("\nLiteSight Agent run completed. Leaving browser open for 10 seconds for observation...")
-    await asyncio.sleep(10)
+    print("\nLiteSight Agent run completed.")
+    print("Keeping browser window open for 25 seconds for human observation (press Ctrl+C to exit)...")
+    await asyncio.sleep(25)
 
 def main():
     parser = argparse.ArgumentParser(description="LiteSight Web Agent")
