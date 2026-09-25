@@ -7,6 +7,7 @@ __pycache__/
 # Environments & Dependencies
 .venv/
 venv/
+source/
 ENV/
 env/
 node_modules/

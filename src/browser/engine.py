@@ -1,9 +1,19 @@
 # src/browser/engine.py
-import torch
+"""
+Browser Engine for LiteSight.
+Manages Chromium instance via Playwright with Fast-Path Indexed DOM extraction,
+On-Device WebGPU privacy sanitization, and strict action execution guards.
+Language: STE (Simplified Technical English).
+"""
+
 import time
 import asyncio
 from pathlib import Path
+from typing import Dict, Any, Tuple, Optional
+import numpy as np
+import playwright.async_api as pw
 from playwright.async_api import async_playwright
+
 from ..orchestrator.exceptions import (
     StaleNodeException,
     ElementObscuredError,
@@ -11,27 +21,35 @@ from ..orchestrator.exceptions import (
     PIIRedactionFailure
 )
 
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+
+
 class BrowserEngine:
     """
-    Manages Playwright browser instance with Fast-Path Indexed DOM extraction,
-    WebGPU privacy sanitization, and strict action execution guards.
+    Controls browser lifecycle and executes guarded actions on the web page.
+    Prioritizes integer-indexed DOM elements and supports zero-DOM coordinate execution.
     """
-    
+
     def __init__(self):
-        self.playwright = None
-        self.browser = None
-        self.page = None
-        self.local_state_tree = {} # Maps elements to their (x, y) coordinates
-        self.latest_snapshot = None
-        
+        self.playwright: Optional[pw.Playwright] = None
+        self.browser: Optional[pw.Browser] = None
+        self.page: Optional[pw.Page] = None
+        self.local_state_tree: Dict[str, Tuple[int, int]] = {}
+        self.latest_snapshot: Optional[Dict[str, Any]] = None
+
     async def initialize(self):
-        """Starts the engine and injects observer, snapshot, and privacy kernels."""
+        """Starts Playwright browser and registers mutation, indexing, and privacy kernels."""
         print("[BrowserEngine] Initializing Playwright (Headed Mode)...")
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=False)
         self.page = await self.browser.new_page()
-        
-        # Helper to read JS scripts from src
+
+        # Scripts to inject on every page load
         base_dir = Path(__file__).parent.parent
         scripts_to_inject = [
             base_dir / "state" / "observer.js",
@@ -41,68 +59,76 @@ class BrowserEngine:
             base_dir / "privacy" / "sanitizer.js",
             base_dir / "privacy" / "inspector_overlay.js",
         ]
-        
-        # Expose Python callbacks for state & metrics
+
+        # Register non-blocking state mutation receiver callback
         await self.page.expose_function("_liteSightStateUpdate", self._handle_mutations)
-        
-        # Inject all scripts to execute on every page load
+
+        # Inject scripts
         for script_path in scripts_to_inject:
             if script_path.exists():
                 with open(script_path, "r", encoding="utf-8") as f:
                     js_code = f.read()
                 await self.page.add_init_script(js_code)
-        
+
         print("[BrowserEngine] Observer, Fast-Path Indexer, and WebGPU Privacy Kernels bound.")
-        
+
     async def navigate(self, url: str):
-        """Navigates to the domain and establishes initial indexed state."""
+        """Navigates to URL and initializes inspector HUD without CPU polling."""
         print(f"[BrowserEngine] Navigating to {url}")
         await self.page.goto(url, wait_until="domcontentloaded")
         # Allow initial async observer batch to settle
         await asyncio.sleep(1.5)
-        # Ensure inspector overlay is mounted
         try:
             await self.page.evaluate("() => { if (window.LiteSightInspector) window.LiteSightInspector.mount(); }")
-        except Exception:
+        except (pw.Error, AttributeError):
             pass
 
-    async def get_indexed_dom_state(self) -> dict:
+    async def get_indexed_dom_state(self) -> Dict[str, Any]:
         """
-        Executes Fast-Path Indexed DOM Tree extraction.
-        Returns JSON matching ARCHITECTURE.md Section 7.B.1 schema.
+        Extracts Fast-Path Indexed DOM snapshot.
+        Returns dictionary matching Section 7.B.1 schema.
         """
         try:
             snapshot = await self.page.evaluate("() => window.generateLiteSightSnapshot()")
             self.latest_snapshot = snapshot
             return snapshot
-        except Exception as e:
-            print(f"[BrowserEngine] Warning: Snapshot extraction fallback: {e}")
-            return {"timestamp": int(time.time() * 1000), "url": self.page.url if self.page else "", "elements": []}
+        except (pw.Error, KeyError, ValueError) as err:
+            print(f"[BrowserEngine] Warning: Snapshot extraction fallback: {err}")
+            return {
+                "timestamp": int(time.time() * 1000),
+                "url": self.page.url if self.page else "",
+                "elements": []
+            }
 
-    async def sanitize_visual_frame(self) -> dict:
+    async def sanitize_visual_frame(self) -> Dict[str, Any]:
         """
         Executes on-device PII detection and context-preserving synthetic vector masking.
-        Guarantees that no raw unmasked credential or ID ever leaves client machine.
+        Raises PIIRedactionFailure if sanitization kernel fails.
         """
         try:
-            detection_res = await self.page.evaluate("async () => await window.LiteSightPrivacyPipeline.sanitizeCurrentView()")
+            detection_res = await self.page.evaluate(
+                "async () => await window.LiteSightPrivacyPipeline.sanitizeCurrentView()"
+            )
             detected_count = detection_res.get("detectedCount", 0)
-            
-            # Update live inspector HUD
-            await self.page.evaluate(f"() => {{ if (window.LiteSightInspector) window.LiteSightInspector.updateSanitizedStats({detected_count}); }}")
-            
-            return detection_res
-        except Exception as e:
-            print(f"[BrowserEngine] Privacy Kernel Error: {e}")
-            raise PIIRedactionFailure(f"WebGPU privacy kernel failed frame sanitization: {e}")
 
-    async def execute_action(self, operation: str, target_index: int = None, text_value: str = None) -> bool:
+            # Update live inspector overlay
+            await self.page.evaluate(
+                f"() => {{ if (window.LiteSightInspector) window.LiteSightInspector.updateSanitizedStats({detected_count}); }}"
+            )
+            return detection_res
+        except (pw.Error, KeyError, ValueError, RuntimeError) as err:
+            print(f"[BrowserEngine] Privacy Kernel Error: {err}")
+            raise PIIRedactionFailure(f"WebGPU privacy kernel failed frame sanitization: {err}")
+
+    async def execute_action(
+        self,
+        operation: str,
+        target_index: Optional[int] = None,
+        text_value: Optional[str] = None
+    ) -> bool:
         """
-        Client Action Execution Guard.
-        Strictly enforces:
-        1. Node freshness check (raises StaleNodeException if missing)
-        2. Visibility & occlusion validation (raises ElementObscuredError)
-        3. Canvas / WebGL non-DOM trigger (raises CanvasFallbackTrigger)
+        Executes action on discrete integer indexed element.
+        Enforces freshness, occlusion, and non-DOM guards.
         """
         start_time = time.time()
         operation = operation.upper()
@@ -121,23 +147,23 @@ class BrowserEngine:
         if target_index is None:
             raise StaleNodeException("Action target_index cannot be null for standard DOM interactions.")
 
-        # 1. Freshness Check: Locate node by data-litesight-index
+        # Guard 1: Freshness check
         element_handle = await self.page.query_selector(f'[data-litesight-index="{target_index}"]')
         if not element_handle:
-            raise StaleNodeException(f"Node [{target_index}] is stale or no longer exists in current DOM tree.")
+            raise StaleNodeException(f"Node [{target_index}] is stale or absent in current DOM tree.")
 
-        # 2. Canvas / Non-DOM Target Check
+        # Guard 2: Canvas or non-DOM element check
         tag_name = await element_handle.evaluate("el => el.tagName.toLowerCase()")
         if tag_name in ["canvas", "webgl", "iframe"]:
             raise CanvasFallbackTrigger(f"Target [{target_index}] resides inside non-indexed <{tag_name}> element.")
 
-        # 3. Visibility and Occlusion Guard
+        # Guard 3: Visibility and occlusion check
         is_visible = await element_handle.is_visible()
         box = await element_handle.bounding_box()
         if not is_visible or not box or box["width"] <= 0 or box["height"] <= 0:
             raise ElementObscuredError(f"Target [{target_index}] is obscured, invisible, or zero-width.")
 
-        # 4. Human Observability: Visually highlight the target element
+        # Visual indicator for human observation
         try:
             await element_handle.evaluate("""el => {
                 try {
@@ -147,34 +173,63 @@ class BrowserEngine:
                     el.style.boxShadow = '0 0 18px rgba(56, 189, 248, 0.85)';
                 } catch(e) {}
             }""")
-        except Exception:
+        except (pw.Error, AttributeError):
             pass
-        
-        # Pacing pause: allows human observer to visually register the targeted element
+
         await asyncio.sleep(0.7)
 
-        # 5. Dispatch Operation with Natural Pacing
-        if operation == "CLICK":
-            print(f"[BrowserEngine] Executing Fast-Path CLICK on [{target_index}] at ({box['x'] + box['width']/2:.0f}, {box['y'] + box['height']/2:.0f})")
-            await element_handle.click(timeout=3000)
-        elif operation == "TYPE_TEXT":
-            print(f"[BrowserEngine] Executing Fast-Path TYPE_TEXT on [{target_index}] -> '{text_value}'")
-            await element_handle.click()
-            await asyncio.sleep(0.2)
-            await element_handle.fill("")
-            # Type with natural delay (40ms/char) so text input is visually observable
-            await element_handle.type(text_value or "", delay=40)
-            await asyncio.sleep(0.4)
-            await self.page.keyboard.press("Enter")
-        elif operation == "SELECT":
-            print(f"[BrowserEngine] Executing Fast-Path SELECT on [{target_index}] -> '{text_value}'")
-            await element_handle.select_option(value=text_value or "")
-        elif operation == "WAIT":
-            await asyncio.sleep(1.5)
-        else:
-            print(f"[BrowserEngine] Unhandled operation: {operation}")
+        # Dispatch operation
+        try:
+            if operation == "CLICK":
+                print(f"[BrowserEngine] Executing Fast-Path CLICK on [{target_index}] at ({box['x'] + box['width']/2:.0f}, {box['y'] + box['height']/2:.0f})")
+                await element_handle.click(timeout=3000)
+            elif operation == "TYPE_TEXT":
+                print(f"[BrowserEngine] Executing Fast-Path TYPE_TEXT on [{target_index}] -> '{text_value}'")
+                # Step 1: Click to activate/focus the input field
+                await element_handle.click()
+                await asyncio.sleep(0.3)
 
-        # Clear highlight and provide step observation interval
+                # Step 2: Re-query element by index.
+                # Dynamic SPAs (e.g. Wikipedia, React apps) swap the DOM node on focus,
+                # making the original handle stale. A fresh query captures the live node.
+                fresh_handle = await self.page.query_selector(f'[data-litesight-index="{target_index}"]')
+
+                try:
+                    if fresh_handle:
+                        await fresh_handle.fill("")
+                        await fresh_handle.type(text_value or "", delay=40)
+                    else:
+                        # Fresh node not found: focused input may be newly mounted.
+                        # Dispatch directly via keyboard to whatever is currently focused.
+                        print(f"[BrowserEngine] Fresh handle not found for [{target_index}]; using keyboard dispatch.")
+                        await self.page.keyboard.type(text_value or "", delay=40)
+                except pw.Error as fill_err:
+                    # Element detached between re-query and fill: use keyboard dispatch.
+                    err_str = str(fill_err).lower()
+                    if "not attached" in err_str or "detached" in err_str:
+                        print(f"[BrowserEngine] Element detached after re-query; using keyboard dispatch.")
+                        await self.page.keyboard.type(text_value or "", delay=40)
+                    else:
+                        raise
+                await asyncio.sleep(0.4)
+                await self.page.keyboard.press("Enter")
+            elif operation == "SELECT":
+                print(f"[BrowserEngine] Executing Fast-Path SELECT on [{target_index}] -> '{text_value}'")
+                await element_handle.select_option(value=text_value or "")
+            elif operation == "WAIT":
+                await asyncio.sleep(1.5)
+            else:
+                print(f"[BrowserEngine] Unhandled operation: {operation}")
+        except pw.Error as err:
+            err_msg = str(err).lower()
+            if "not attached" in err_msg or "stale" in err_msg or "detached" in err_msg:
+                raise StaleNodeException(f"Node [{target_index}] detached from DOM during {operation}: {err}") from err
+            elif "not visible" in err_msg or "obscured" in err_msg or "timeout" in err_msg:
+                raise ElementObscuredError(f"Node [{target_index}] obscured or timed out during {operation}: {err}") from err
+            else:
+                raise StaleNodeException(f"Node [{target_index}] interaction failed: {err}") from err
+
+        # Clear visual indicator
         try:
             await element_handle.evaluate("""el => {
                 try {
@@ -182,27 +237,58 @@ class BrowserEngine:
                     el.style.boxShadow = '';
                 } catch(e) {}
             }""")
-        except Exception:
+        except (pw.Error, AttributeError):
             pass
 
         elapsed_ms = int((time.time() - start_time) * 1000)
         await self._update_inspector_hud(f"{operation} [{target_index}]", elapsed_ms)
-        
-        # Observation pause: lets human observers see the resulting page update
         await asyncio.sleep(1.2)
         return True
 
+    async def execute_coordinate_action(
+        self,
+        operation: str,
+        x: int,
+        y: int,
+        text_value: Optional[str] = None
+    ) -> bool:
+        """
+        Executes action directly at screen coordinates (x, y).
+        Enables Pure Visual Inference (Zero-DOM Dependency).
+        """
+        start_time = time.time()
+        operation = operation.upper()
+
+        print(f"[BrowserEngine] Executing Zero-DOM Coordinate Action: {operation} at ({x}, {y})")
+        if operation == "CLICK":
+            await self.page.mouse.click(x, y)
+        elif operation == "TYPE_TEXT":
+            await self.page.mouse.click(x, y)
+            await asyncio.sleep(0.2)
+            await self.page.keyboard.type(text_value or "", delay=40)
+            await asyncio.sleep(0.4)
+            await self.page.keyboard.press("Enter")
+
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        await self._update_inspector_hud(f"{operation} ({x},{y})", elapsed_ms)
+        await asyncio.sleep(1.0)
+        return True
+
     async def _update_inspector_hud(self, action_str: str, latency_ms: int):
+        """Updates live metrics in the browser inspector HUD."""
         try:
-            await self.page.evaluate(f"() => {{ if (window.LiteSightInspector) window.LiteSightInspector.updateAction('{action_str}', {latency_ms}); }}")
-        except Exception:
+            await self.page.evaluate(
+                f"() => {{ if (window.LiteSightInspector) window.LiteSightInspector.updateAction('{action_str}', {latency_ms}); }}"
+            )
+        except (pw.Error, AttributeError):
             pass
 
-    async def get_current_image(self) -> torch.Tensor:
-        """Captures frame tensor for foveated visual fallback."""
-        tensor = torch.zeros((3, 1080, 1920), dtype=torch.uint8)
-        return tensor
-        
+    async def get_current_image(self) -> Any:
+        """Captures frame tensor or array for foveated visual fallback."""
+        if TORCH_AVAILABLE:
+            return torch.zeros((3, 1080, 1920), dtype=torch.uint8)
+        return np.zeros((3, 1080, 1920), dtype=np.uint8)
+
     def _handle_mutations(self, mutations):
         """Passively receives mutation diffs without polling."""
         for mutation in mutations:
@@ -211,3 +297,10 @@ class BrowserEngine:
                     key = f"{node.get('tag', '')}_{node.get('text', '')}".lower()
                     if key.strip("_"):
                         self.local_state_tree[key] = (node.get("x", 0), node.get("y", 0))
+
+    async def close(self):
+        """Closes browser session gracefully."""
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
