@@ -348,6 +348,8 @@ class Orchestrator:
         self.pure_vision = pure_vision
         self.use_swarm = use_swarm
         self.swarm_coordinator = SwarmCoordinator() if use_swarm else None
+        if use_swarm and self.swarm_coordinator:
+            browser_api.set_message_bus(self.swarm_coordinator.bus)
         self.current_plan: List[str] = []
 
     async def run(self, start_url: str, initial_goal: Optional[str] = None):
@@ -365,7 +367,7 @@ class Orchestrator:
         if prefs:
             print(f"[Orchestrator] RAP: Injected {len(prefs)} local preferences into context.")
 
-        safe_state = self.sanitizer.sanitize_state(self.executor.local_state_tree)
+        safe_state = self.sanitizer.sanitize_state(self.executor.browser_api.local_state_tree)
         compressed_cso = self.cso_tracker.get_compressed_context()
 
         context = {

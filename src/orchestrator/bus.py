@@ -7,6 +7,7 @@ Language: STE (Simplified Technical English).
 """
 
 import asyncio
+import inspect
 from typing import Dict, List, Callable, Any, Optional
 import time
 
@@ -49,7 +50,7 @@ class LocalMessageBus:
         message = Message(topic=topic, payload=payload, sender=sender)
         handlers = self._subscribers.get(topic, [])
         for handler in handlers:
-            if asyncio.iscoroutinefunction(handler):
+            if inspect.iscoroutinefunction(handler):
                 asyncio.create_task(handler(message))
             else:
                 handler(message)

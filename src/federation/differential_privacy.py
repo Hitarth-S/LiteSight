@@ -70,6 +70,7 @@ class DifferentialPrivacyEngine:
         2. Adds calibrated Gaussian noise.
         3. Records budget expenditure.
         """
+        original_dtype = weights.dtype
         flat_weights = weights.flatten().astype(np.float64)
         clipped, original_norm = self.clip_vector(flat_weights)
         noisy = self.add_noise(clipped)
@@ -78,7 +79,7 @@ class DifferentialPrivacyEngine:
         self.total_epsilon_spent += self.epsilon
         self.total_delta_spent += self.delta
 
-        sanitized_weights = noisy.reshape(weights.shape)
+        sanitized_weights = noisy.reshape(weights.shape).astype(original_dtype)
         return {
             "privatized_weights": sanitized_weights,
             "original_norm": float(original_norm),

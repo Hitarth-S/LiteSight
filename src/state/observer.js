@@ -26,6 +26,10 @@ class DOMObserver {
         // Batch Processing: array of MutationRecord objects
         const changes = [];
         for (const mutation of mutationsList) {
+            // Skip LiteSight's own attribute mutations to prevent feedback loops
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-litesight-index') {
+                continue;
+            }
             changes.push({
                 type: mutation.type,
                 targetId: mutation.target.id || "unnamed_node",

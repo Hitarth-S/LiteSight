@@ -35,18 +35,23 @@ class BrowserEngine:
     Prioritizes integer-indexed DOM elements and supports zero-DOM coordinate execution.
     """
 
-    def __init__(self):
+    def __init__(self, headless: bool = False):
+        self.headless = headless
         self.playwright: Optional[pw.Playwright] = None
         self.browser: Optional[pw.Browser] = None
         self.page: Optional[pw.Page] = None
         self.local_state_tree: Dict[str, Tuple[int, int]] = {}
         self.latest_snapshot: Optional[Dict[str, Any]] = None
+        self.message_bus: Optional[Any] = None
+
+    def set_message_bus(self, bus):
+        self.message_bus = bus
 
     async def initialize(self):
         """Starts Playwright browser and registers mutation, indexing, and privacy kernels."""
         print("[BrowserEngine] Initializing Playwright (Headed Mode)...")
         self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.chromium.launch(headless=False)
+        self.browser = await self.playwright.chromium.launch(headless=self.headless)
         self.page = await self.browser.new_page()
 
         # Scripts to inject on every page load
@@ -145,7 +150,7 @@ class BrowserEngine:
             return True
 
         if target_index is None:
-            raise StaleNodeException("Action target_index cannot be null for standard DOM interactions.")
+            raise ValueError("Action target_index cannot be null for standard DOM interactions.")
 
         # Guard 1: Freshness check
         element_handle = await self.page.query_selector(f'[data-litesight-index="{target_index}"]')
@@ -212,7 +217,6 @@ class BrowserEngine:
                     else:
                         raise
                 await asyncio.sleep(0.4)
-                await self.page.keyboard.press("Enter")
             elif operation == "SELECT":
                 print(f"[BrowserEngine] Executing Fast-Path SELECT on [{target_index}] -> '{text_value}'")
                 await element_handle.select_option(value=text_value or "")
@@ -267,7 +271,6 @@ class BrowserEngine:
             await asyncio.sleep(0.2)
             await self.page.keyboard.type(text_value or "", delay=40)
             await asyncio.sleep(0.4)
-            await self.page.keyboard.press("Enter")
 
         elapsed_ms = int((time.time() - start_time) * 1000)
         await self._update_inspector_hud(f"{operation} ({x},{y})", elapsed_ms)
@@ -285,9 +288,21 @@ class BrowserEngine:
 
     async def get_current_image(self) -> Any:
         """Captures frame tensor or array for foveated visual fallback."""
-        if TORCH_AVAILABLE:
-            return torch.zeros((3, 1080, 1920), dtype=torch.uint8)
-        return np.zeros((3, 1080, 1920), dtype=np.uint8)
+        try:
+            png_bytes = await self.page.screenshot(type="png")
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+            arr = np.array(img)  # (H, W, 3) uint8
+            arr = arr.transpose(2, 0, 1)  # (3, H, W)
+            if TORCH_AVAILABLE:
+                return torch.from_numpy(arr.copy())
+            return arr
+        except Exception as e:
+            print(f"[BrowserEngine] Screenshot capture failed: {e}. Returning blank frame.")
+            if TORCH_AVAILABLE:
+                return torch.zeros((3, 1080, 1920), dtype=torch.uint8)
+            return np.zeros((3, 1080, 1920), dtype=np.uint8)
 
     def _handle_mutations(self, mutations):
         """Passively receives mutation diffs without polling."""
@@ -297,6 +312,16 @@ class BrowserEngine:
                     key = f"{node.get('tag', '')}_{node.get('text', '')}".lower()
                     if key.strip("_"):
                         self.local_state_tree[key] = (node.get("x", 0), node.get("y", 0))
+
+        if self.message_bus and mutations:
+            try:
+                loop = asyncio.get_event_loop()
+                loop.call_soon_threadsafe(
+                    asyncio.ensure_future,
+                    self.message_bus.publish("dom.mutation_batch", {"mutations": mutations}, sender="BrowserEngine")
+                )
+            except RuntimeError:
+                pass  # No event loop available
 
     async def close(self):
         """Closes browser session gracefully."""

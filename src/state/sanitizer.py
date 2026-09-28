@@ -22,12 +22,19 @@ class StateSanitizer:
         Takes the raw local_state_tree and returns a safely redacted copy.
         """
         sanitized_tree = {}
-        for key, coords in state_tree.items():
+        for key, value in state_tree.items():
             safe_key = key
             # Scrub against all known PII patterns
             for pii_type, pattern in self.patterns.items():
                 safe_key = pattern.sub(f"[REDACTED_{pii_type.upper()}]", safe_key)
             
-            sanitized_tree[safe_key] = coords
+            # Also sanitize string values within tuples/lists
+            if isinstance(value, str):
+                safe_value = value
+                for pii_type, pattern in self.patterns.items():
+                    safe_value = pattern.sub(f"[REDACTED_{pii_type.upper()}]", safe_value)
+                sanitized_tree[safe_key] = safe_value
+            else:
+                sanitized_tree[safe_key] = value
             
         return sanitized_tree

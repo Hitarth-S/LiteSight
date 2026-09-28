@@ -80,7 +80,13 @@
             const tag = el.tagName.toLowerCase();
             const role = getElementRole(el);
             const label = getElementLabel(el);
-            const val = el.value !== undefined ? String(el.value).substring(0, 100) : (el.innerText || '').substring(0, 100);
+            // Redact password fields to prevent plaintext PII leakage
+            let val;
+            if (el.type === 'password') {
+                val = '[REDACTED]';
+            } else {
+                val = el.value !== undefined ? String(el.value).substring(0, 100) : (el.innerText || '').substring(0, 100);
+            }
 
             // Bounding box strictly conforming to schema
             const bounding_box = {

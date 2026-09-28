@@ -22,7 +22,8 @@ async def run_agent(
     target_url: str,
     initial_goal: str = None,
     pure_vision: bool = False,
-    use_swarm: bool = False
+    use_swarm: bool = False,
+    headless: bool = False
 ):
     """Initializes and runs the LiteSight agent lifecycle."""
     print("Initializing LiteSight Agent (Constrained Edge Mode)...")
@@ -34,7 +35,7 @@ async def run_agent(
         print("[Main] Mode: Fast-Path Indexed DOM First.")
 
     vision_api = FoveatedTokenizer(base_resolution=(1920, 1080), patch_size=224)
-    browser_api = BrowserEngine()
+    browser_api = BrowserEngine(headless=headless)
 
     print("[Main] Launching Browser Engine and injecting JS observer...")
     try:
@@ -55,12 +56,14 @@ async def run_agent(
     except (pw.Error, TimeoutError) as nav_err:
         print(f"[Main] Navigation notice: {nav_err}")
 
-    await orchestrator.run(target_url, initial_goal)
+    try:
+        await orchestrator.run(target_url, initial_goal)
 
-    print("\nLiteSight Agent run completed.")
-    print("Keeping browser window open for 10 seconds for human observation...")
-    await asyncio.sleep(10)
-    await browser_api.close()
+        print("\nLiteSight Agent run completed.")
+        print("Keeping browser window open for 10 seconds for human observation...")
+        await asyncio.sleep(10)
+    finally:
+        await browser_api.close()
 
 
 def main():
@@ -69,13 +72,15 @@ def main():
     parser.add_argument("--goal", type=str, default=None, help="Initial goal override (skips slow planner)")
     parser.add_argument("--pure-vision", action="store_true", help="Enable 100% pixel-to-coordinate zero-DOM mode")
     parser.add_argument("--swarm", action="store_true", help="Enable local multi-agent swarm architecture")
+    parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
     args = parser.parse_args()
 
     asyncio.run(run_agent(
         target_url=args.url,
         initial_goal=args.goal,
         pure_vision=args.pure_vision,
-        use_swarm=args.swarm
+        use_swarm=args.swarm,
+        headless=args.headless
     ))
 
 

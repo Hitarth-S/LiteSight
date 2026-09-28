@@ -22,10 +22,12 @@ class NightlyLoRAScheduler:
         self.daily_trajectories: List[Dict[str, Any]] = []
         self.federated_client = federated_client or FederatedClient()
         self.last_exported_payload: Optional[FederatedWeightPayload] = None
+        self._lock = threading.Lock()
 
     def log_successful_trajectory(self, trajectory_data: Dict[str, Any]):
         """Logs verified successful trajectory for nightly compilation."""
-        self.daily_trajectories.append(trajectory_data)
+        with self._lock:
+            self.daily_trajectories.append(trajectory_data)
         print(f"[Scheduler] Logged successful trajectory for nightly learning. Total: {len(self.daily_trajectories)}")
 
     def run_nightly_job(self) -> Optional[FederatedWeightPayload]:
@@ -36,23 +38,24 @@ class NightlyLoRAScheduler:
         3. Prepares anonymous federated export payload.
         """
         print("[Scheduler] Initiating Nightly LoRA Fine-Tuning and DP Aggregation...")
-        if not self.daily_trajectories:
-            print("[Scheduler] No new trajectories to learn from today.")
-            return None
+        with self._lock:
+            if not self.daily_trajectories:
+                print("[Scheduler] No new trajectories to learn from today.")
+                return None
 
-        print(f"[Scheduler] Compiling {len(self.daily_trajectories)} trajectories into LoRA dataset...")
-        # Generate differentially private weight update
-        payload = self.federated_client.generate_privatized_update(
-            self.daily_trajectories,
-            layer_name="edge_muscle_memory_lora"
-        )
-        self.last_exported_payload = payload
+            print(f"[Scheduler] Compiling {len(self.daily_trajectories)} trajectories into LoRA dataset...")
+            # Generate differentially private weight update
+            payload = self.federated_client.generate_privatized_update(
+                self.daily_trajectories,
+                layer_name="edge_muscle_memory_lora"
+            )
+            self.last_exported_payload = payload
 
-        print(f"[Scheduler] Differential Privacy applied. Epsilon: {payload.privacy_budget['current_epsilon']}")
-        print(f"[Scheduler] Nightly LoRA fine-tuning complete. Model muscle memory updated.")
+            print(f"[Scheduler] Differential Privacy applied. Epsilon: {payload.privacy_budget['current_epsilon']}")
+            print(f"[Scheduler] Nightly LoRA fine-tuning complete. Model muscle memory updated.")
 
-        # Clear processed trajectories
-        self.daily_trajectories.clear()
+            # Clear processed trajectories
+            self.daily_trajectories.clear()
         return payload
 
     def trigger_manual_nightly_job(self):
