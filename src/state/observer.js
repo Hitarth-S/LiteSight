@@ -38,7 +38,7 @@ class DOMObserver {
                         const rect = node.getBoundingClientRect();
                         return {
                             tag: node.tagName,
-                            text: node.innerText?.trim().substring(0, 50) || "",
+                            text: node.textContent?.trim().substring(0, 50) || "",
                             x: rect.x + (rect.width / 2),
                             y: rect.y + (rect.height / 2)
                         };

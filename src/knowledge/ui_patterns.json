@@ -1,0 +1,422 @@
+{
+  "version": "1.2.0",
+  "description": "LiteSight Cross-Site Generalized UI Pattern Knowledge Base",
+  "last_updated": "2026-09-29T17:46:47Z",
+  "intents": {
+    "SEARCH_INPUT": {
+      "roles": [
+        "textbox",
+        "button",
+        "combobox",
+        "searchbox"
+      ],
+      "tags": [
+        "input",
+        "select",
+        "textarea"
+      ],
+      "label_keywords": [
+        "search",
+        "search products",
+        "search search",
+        "cookie list",
+        "what can",
+        "find",
+        "prehydratesearch",
+        "search your",
+        "searchtype searchtype",
+        "search artist",
+        "search wikipedia",
+        "search arxiv",
+        "subject search",
+        "site search",
+        "query",
+        "vendor list",
+        "quick search",
+        "search field",
+        "search pypi",
+        "search free",
+        "photos search",
+        "search packages",
+        "search block",
+        "search example",
+        "searchtype"
+      ],
+      "spatial_hint": "header",
+      "max_y": 160,
+      "base_weight": 10
+    },
+    "FILTER_RATING": {
+      "roles": [
+        "link",
+        "checkbox",
+        "button",
+        "radio",
+        "option"
+      ],
+      "tags": [
+        "a",
+        "button",
+        "label",
+        "span",
+        "div"
+      ],
+      "label_keywords": [
+        "4 star and above",
+        "4 star & above",
+        "4 stars and above",
+        "4 stars & above",
+        "4 star or above",
+        "4 stars or above",
+        "4 & up",
+        "4\u2605",
+        "4 star",
+        "4 stars",
+        "four star",
+        "customer ratings",
+        "ratings",
+        "customer review",
+        "reviews"
+      ],
+      "spatial_hint": "sidebar",
+      "base_weight": 14
+    },
+    "ADD_TO_CART": {
+      "roles": [
+        "button",
+        "link",
+        "input"
+      ],
+      "tags": [
+        "button",
+        "a",
+        "input"
+      ],
+      "label_keywords": [
+        "add to basket",
+        "buy now",
+        "add to cart",
+        "add item to cart",
+        "add product to cart",
+        "add to bag"
+      ],
+      "spatial_hint": "content",
+      "base_weight": 14
+    },
+    "VIEW_CART": {
+      "roles": [
+        "link",
+        "button"
+      ],
+      "tags": [
+        "a",
+        "div",
+        "button"
+      ],
+      "label_keywords": [
+        "cart",
+        "goto cart",
+        "go to cart",
+        "cart 0 items",
+        "cart contains 0 items total amount $0.00",
+        "view cart",
+        "shopping cart",
+        "shopify opens checkout to browser-based ai agents",
+        "basket",
+        "proceed to cart",
+        "bag",
+        "checkout"
+      ],
+      "spatial_hint": "header",
+      "base_weight": 10
+    },
+    "CLOSE_MODAL": {
+      "roles": [
+        "button",
+        "link",
+        "span",
+        "a"
+      ],
+      "tags": [
+        "button",
+        "a",
+        "span",
+        "svg"
+      ],
+      "label_keywords": [
+        "close",
+        "x",
+        "\u2715",
+        "dismiss",
+        "not now",
+        "cancel",
+        "skip",
+        "no thanks",
+        "maybe later"
+      ],
+      "spatial_hint": "overlay",
+      "base_weight": 12
+    },
+    "COOKIE_CONSENT": {
+      "roles": [
+        "button",
+        "checkbox",
+        "link"
+      ],
+      "tags": [
+        "button",
+        "input",
+        "label",
+        "a"
+      ],
+      "label_keywords": [
+        "allow all",
+        "i agree the terms of use and privacy policy",
+        "accept",
+        "accept all cookies",
+        "accept all",
+        "accept cookies",
+        "i agree",
+        "got it",
+        "agree & continue",
+        "ok"
+      ],
+      "spatial_hint": "overlay",
+      "base_weight": 14
+    },
+    "LOGIN_INPUT": {
+      "roles": [
+        "textbox",
+        "combobox"
+      ],
+      "tags": [
+        "input"
+      ],
+      "label_keywords": [
+        "email address email-address email-address",
+        "example: test@gmail.com txtsubemail",
+        "enter otp here txtemail1",
+        "enter password txtemail2",
+        "email id or mobile number txtemail",
+        "email id or mobile number txtemail5 txtemail5",
+        "email address email email",
+        "enter your email source",
+        "enter your email you@domain.com user_email hero_user_email",
+        "enter your email you@domain.com user_email bottom_cta_section_user_email",
+        "your email address susbscribe_email",
+        "username",
+        "username only letters, numbers, and underscores are allowed username username",
+        "email-address",
+        "enter your phone number",
+        "email id or mobile number",
+        "email address",
+        "your email address",
+        "user name",
+        "email",
+        "e-mail",
+        "phone",
+        "login",
+        "user id",
+        "account"
+      ],
+      "spatial_hint": "content",
+      "base_weight": 12
+    },
+    "PASSWORD_INPUT": {
+      "roles": [
+        "textbox"
+      ],
+      "tags": [
+        "input"
+      ],
+      "label_keywords": [
+        "enter password txtemail2",
+        "create new password pass pass",
+        "password",
+        "password password password",
+        "create new password",
+        "enter password",
+        "passcode",
+        "pin",
+        "secret"
+      ],
+      "spatial_hint": "content",
+      "base_weight": 14
+    },
+    "SUBMIT_AUTH": {
+      "roles": [
+        "link",
+        "button",
+        "input"
+      ],
+      "tags": [
+        "a",
+        "button",
+        "div",
+        "input"
+      ],
+      "label_keywords": [
+        "sign in",
+        "log in",
+        "next",
+        "login",
+        "next slide",
+        "submit",
+        "sign in or create account",
+        "next gen",
+        "login/ register",
+        "sign in / sign up",
+        "next page",
+        "account, sign in",
+        "sign in account",
+        "next slide for herocarousel list",
+        "next \u2192",
+        "corporate travel login corporate account",
+        "agent login login your agent account",
+        "btn_login",
+        "btn_login otplgnbtn",
+        "continue",
+        "sign in/register",
+        "next items",
+        "you are encouraged to create an account and log in; however, it is not mandatory",
+        "you're encouraged to log in; however, it's not mandatory. [o]",
+        "how to submit to arxiv"
+      ],
+      "spatial_hint": "content",
+      "base_weight": 12
+    },
+    "SIGNUP_BUTTON": {
+      "roles": [
+        "link",
+        "button",
+        "input"
+      ],
+      "tags": [
+        "a",
+        "button",
+        "div",
+        "input"
+      ],
+      "label_keywords": [
+        "sign up",
+        "get started",
+        "sign in or create account",
+        "create account",
+        "register",
+        "login/ register",
+        "sign in / sign up",
+        "sign in/register",
+        "get started on ticketmaster",
+        "theregister.com",
+        "register now",
+        "login or sign up",
+        "sign up for github",
+        "sign up for free",
+        "signup / login",
+        "test register page",
+        "sign up here",
+        "login/register",
+        "signup",
+        "join now"
+      ],
+      "spatial_hint": "content",
+      "base_weight": 12
+    },
+    "BOOKING_CTA": {
+      "roles": [
+        "button",
+        "link"
+      ],
+      "tags": [
+        "button",
+        "a"
+      ],
+      "label_keywords": [
+        "search flights",
+        "book now",
+        "search trains",
+        "search buses",
+        "find tickets",
+        "check availability",
+        "reserve",
+        "select seats",
+        "book ticket"
+      ],
+      "spatial_hint": "content",
+      "base_weight": 14
+    },
+    "DOWNLOAD_CTA": {
+      "roles": [
+        "link",
+        "button"
+      ],
+      "tags": [
+        "a",
+        "button"
+      ],
+      "label_keywords": [
+        "download app",
+        "download on the app store",
+        "secure file download",
+        "download this page as a pdf file",
+        "explore all strictlyvc download episodes",
+        "download the wired app",
+        "download now \u00bb",
+        "installing python modules",
+        "download these documents",
+        "download the documentation",
+        "download github copilot app",
+        "install",
+        "google download analytics",
+        "download",
+        "most recent downloads",
+        "install cargo",
+        "most downloaded",
+        "download for windows - arm64",
+        "download for mac - apple silicon",
+        "download for windows - amd64",
+        "download for linux",
+        "download for mac - intel chip",
+        "file download",
+        "file downloader",
+        "download zip"
+      ],
+      "spatial_hint": "content",
+      "base_weight": 14
+    },
+    "SELECT_DROPDOWN": {
+      "roles": [
+        "combobox",
+        "listbox"
+      ],
+      "tags": [
+        "div",
+        "select"
+      ],
+      "label_keywords": [
+        "trip type",
+        "trip type return",
+        "role role role select your role patient donor hospital operative admin",
+        "role",
+        "select your role",
+        "select",
+        "choose",
+        "country",
+        "state",
+        "category",
+        "type",
+        "gender",
+        "status",
+        "department",
+        "user role",
+        "account type"
+      ],
+      "spatial_hint": "content",
+      "base_weight": 14
+    }
+  },
+  "generalization_metric": {
+    "total_domains_analyzed": 38,
+    "intents_covered": 13
+  }
+}

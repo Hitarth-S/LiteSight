@@ -1,4 +1,4 @@
-// src/privacy/sanitizer.js
+// extension/sanitizer.js
 /**
  * Combined WebGPU & Synthetic Masking Privacy Pipeline.
  * Orchestrates detector.js and canvas_masker.js within browser context.

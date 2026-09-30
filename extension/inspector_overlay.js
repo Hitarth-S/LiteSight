@@ -1,4 +1,4 @@
-// src/privacy/inspector_overlay.js
+// extension/inspector_overlay.js
 /**
  * Dual-Pane Visual Privacy & Action Inspector + Real-Time In-Page Privacy Indicators.
  * Fulfills Feature 2 of SIH MVP & User Request:

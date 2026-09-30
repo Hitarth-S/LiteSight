@@ -60,8 +60,9 @@ class FederatedClient:
         weight_dimension: int = 128
     ):
         if client_id is None:
-            # Deterministic anonymous client identifier
-            random_seed = f"litesight_edge_{time.time()}"
+            # Cryptographically secure anonymous client identifier
+            import secrets
+            random_seed = f"litesight_edge_{secrets.token_hex(16)}"
             self.client_id = hashlib.sha256(random_seed.encode("utf-8")).hexdigest()[:16]
         else:
             self.client_id = client_id

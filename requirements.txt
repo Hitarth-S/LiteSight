@@ -1,4 +1,4 @@
---extra-index-url https://download.pytorch.org/whl/cpu
+--find-links https://download.pytorch.org/whl/cpu
 
 # Environment variables
 python-dotenv>=1.0.0

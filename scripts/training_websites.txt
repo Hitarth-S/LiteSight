@@ -1,0 +1,91 @@
+# LiteSight UI Pattern Training Websites
+# Comprehensive corpus for cross-site UI pattern extraction and generalization
+# Total Target Domains: 68 websites across core agent verticals
+
+# ==============================================================================
+# 1. Product Browsing & E-Commerce (16 sites)
+# ==============================================================================
+https://www.amazon.in
+https://www.flipkart.com
+https://www.ebay.com
+https://www.myntra.com
+https://www.ajio.com
+https://www.croma.com
+https://www.reliancedigital.in
+https://www.nykaa.com
+https://www.tatacliq.com
+https://www.target.com
+https://www.walmart.com
+https://www.etsy.com
+https://www.bestbuy.com
+https://www.newegg.com
+https://books.toscrape.com
+https://quotes.toscrape.com
+
+# ==============================================================================
+# 2. Ticket Booking & Travel (Flights, Trains, Buses, Movies, Hotels) (16 sites)
+# ==============================================================================
+https://www.booking.com
+https://in.bookmyshow.com
+https://www.redbus.in
+https://www.makemytrip.com
+https://www.cleartrip.com
+https://www.easemytrip.com
+https://www.yatra.com
+https://www.skyscanner.net
+https://www.kayak.com
+https://www.expedia.com
+https://www.agoda.com
+https://www.tripadvisor.com
+https://www.ixigo.com
+https://www.goibibo.com
+https://www.cinepolisindia.com
+https://www.ticketmaster.com
+
+# ==============================================================================
+# 3. Summarizing, Knowledge, Documentation & News (16 sites)
+# ==============================================================================
+https://en.wikipedia.org
+https://arxiv.org
+https://news.ycombinator.com
+https://dev.to
+https://www.bbc.com
+https://stackoverflow.com
+https://theverge.com
+https://techcrunch.com
+https://www.reuters.com
+https://medium.com
+https://www.wired.com
+https://developer.mozilla.org
+https://docs.python.org
+https://playwright.dev
+https://www.reddit.com
+https://w3schools.com
+
+# ==============================================================================
+# 4. Downloading, Repositories, Datasets & Free Media (14 sites)
+# ==============================================================================
+https://github.com
+https://gitlab.com
+https://pypi.org
+https://archive.org
+https://sourceforge.net
+https://huggingface.co
+https://unsplash.com
+https://pixabay.com
+https://www.pexels.com
+https://freepik.com
+https://kaggle.com
+https://www.npmjs.com
+https://crates.io
+https://docker.com
+
+# ==============================================================================
+# 5. UI Controls, Auth & Form Testbeds (6 sites)
+# ==============================================================================
+https://the-internet.herokuapp.com
+https://demoqa.com
+https://formstone.it
+https://automationexercise.com
+https://parabank.parasoft.com
+https://practice.expandtesting.com

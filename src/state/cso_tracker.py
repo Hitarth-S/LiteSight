@@ -1,4 +1,6 @@
 # src/state/cso_tracker.py
+from typing import Optional, List
+
 
 class CSOTracker:
     """
@@ -11,7 +13,7 @@ class CSOTracker:
         self.cso_log = []
         self.max_entries = 50
         
-    def append_state(self, user_goal: str, completed_steps: list, current_blocker: str = None):
+    def append_state(self, user_goal: str, completed_steps: List[str], current_blocker: Optional[str] = None):
         """Appends a highly compressed state representation."""
         entry = {
             "user_goal": user_goal,

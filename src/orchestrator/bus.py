@@ -30,6 +30,7 @@ class LocalMessageBus:
     def __init__(self):
         self._subscribers: Dict[str, List[Callable[[Message], Any]]] = {}
         self._response_futures: Dict[str, asyncio.Future] = {}
+        self._background_tasks: set = set()
 
     def subscribe(self, topic: str, handler: Callable[[Message], Any]):
         """Subscribes an agent callback handler to a specific topic."""
@@ -51,7 +52,9 @@ class LocalMessageBus:
         handlers = self._subscribers.get(topic, [])
         for handler in handlers:
             if inspect.iscoroutinefunction(handler):
-                asyncio.create_task(handler(message))
+                task = asyncio.create_task(handler(message))
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
             else:
                 handler(message)
 

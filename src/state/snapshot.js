@@ -13,25 +13,87 @@
             return false;
         }
         const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 &&
-               rect.bottom >= 0 && rect.right >= 0 &&
-               rect.top <= (window.innerHeight || document.documentElement.clientHeight) &&
-               rect.left <= (window.innerWidth || document.documentElement.clientWidth);
+        // Must have non-zero dimensions and not be positioned off-screen (e.g. left: -10000px screen-reader cloaks)
+        return rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.left > -500;
+    }
+
+    function normalizeText(str) {
+        if (!str) return '';
+        return str
+            .replace(/[★⭐]/g, ' star ')
+            .replace(/&/g, ' and ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function findAssociatedLabel(el) {
+        const tag = el.tagName.toLowerCase();
+        if (!['input', 'select', 'textarea'].includes(tag)) return '';
+
+        // 1. Native el.labels (when <label for="id"> is used)
+        if (el.labels && el.labels.length > 0) {
+            const txt = Array.from(el.labels).map(l => l.innerText || l.textContent || '').join(' ').trim();
+            if (txt) return txt;
+        }
+        // 2. Query label[for="id"] directly
+        if (el.id) {
+            try {
+                const lbl = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+                if (lbl && (lbl.innerText || lbl.textContent)) return (lbl.innerText || lbl.textContent).trim();
+            } catch(e) {}
+        }
+        // 3. Parent label wrapping element: <label>Username <input></label>
+        const parentLabel = el.closest('label');
+        if (parentLabel) {
+            const clone = parentLabel.cloneNode(true);
+            clone.querySelectorAll('input, select, textarea').forEach(c => c.remove());
+            const txt = (clone.innerText || clone.textContent || '').trim();
+            if (txt) return txt;
+        }
+        // 4. Sibling label in immediate wrapper container (form-group, field, div, tr, p)
+        const container = el.closest('.form-group, .form-row, .field, .input-group, div, tr, p');
+        if (container && container.tagName.toLowerCase() !== 'form' && container.tagName.toLowerCase() !== 'body') {
+            const siblingLabel = container.querySelector('label');
+            if (siblingLabel && (siblingLabel.innerText || siblingLabel.textContent)) {
+                return (siblingLabel.innerText || siblingLabel.textContent).trim();
+            }
+            const prev = el.previousElementSibling;
+            if (prev && ['span', 'label', 'div', 'p', 'b', 'strong', 'td', 'th'].includes(prev.tagName.toLowerCase())) {
+                const txt = (prev.innerText || prev.textContent || '').trim();
+                if (txt && txt.length < 50) return txt;
+            }
+        }
+        return '';
     }
 
     function getElementLabel(el) {
-        // Check aria-label, aria-labelledby, placeholder, title, alt, textContent
-        if (el.getAttribute('aria-label')) return el.getAttribute('aria-label').trim();
-        if (el.getAttribute('placeholder')) return el.getAttribute('placeholder').trim();
-        if (el.getAttribute('title')) return el.getAttribute('title').trim();
-        if (el.getAttribute('alt')) return el.getAttribute('alt').trim();
-        if (el.labels && el.labels.length > 0) {
-            return Array.from(el.labels).map(l => l.innerText.trim()).join(' ');
+        const tag = el.tagName.toLowerCase();
+        let explicit = '';
+        if (el.getAttribute('aria-label')) explicit = el.getAttribute('aria-label').trim();
+        else if (el.getAttribute('placeholder')) explicit = el.getAttribute('placeholder').trim();
+        else if (el.getAttribute('title')) explicit = el.getAttribute('title').trim();
+        else if (el.getAttribute('alt')) explicit = el.getAttribute('alt').trim();
+
+        const associated = findAssociatedLabel(el);
+        const nameId = [el.name, el.id].filter(Boolean).join(' ');
+
+        // For <select> dropdowns: combine associated label + name + selected/all options
+        if (tag === 'select') {
+            const options = Array.from(el.options || []).map(o => o.text || o.value).join(' ');
+            const parts = [associated, explicit, nameId, options].filter(Boolean);
+            return normalizeText(parts.join(' ')).substring(0, 100);
         }
-        
-        // For buttons/links/headings, get immediate text
-        const text = el.innerText || el.textContent || '';
-        return text.trim().substring(0, 100);
+
+        // For inputs & textareas: combine associated label + explicit/placeholder + name/id
+        if (tag === 'input' || tag === 'textarea') {
+            const parts = [associated, explicit, nameId].filter(Boolean);
+            if (parts.length > 0) return normalizeText(parts.join(' ')).substring(0, 100);
+            return normalizeText(el.value || el.type || '').substring(0, 100);
+        }
+
+        // For buttons, links, etc.
+        let base = explicit || el.innerText || el.textContent || associated || nameId;
+        return normalizeText(base).substring(0, 100);
     }
 
     function getElementRole(el) {
@@ -45,6 +107,7 @@
             if (['checkbox', 'radio'].includes(el.type)) return el.type;
             return 'textbox';
         }
+        if (tag === 'summary') return 'button';
         if (tag === 'textarea') return 'textbox';
         if (tag === 'select') return 'combobox';
         if (tag === 'canvas') return 'canvas';
@@ -59,13 +122,18 @@
             'input',
             'textarea',
             'select',
+            'summary',
             '[role="button"]',
             '[role="link"]',
             '[role="textbox"]',
             '[role="combobox"]',
             '[role="checkbox"]',
             '[role="radio"]',
+            '[role="tab"]',
+            '[role="option"]',
+            '[role="menuitem"]',
             '[tabindex]:not([tabindex="-1"])',
+            '[onclick]',
             'canvas',
             'iframe'
         ].join(', ');
@@ -112,13 +180,11 @@
             currentIndex++;
         }
 
-        const snapshot = {
+        return {
             timestamp: Date.now(),
             url: window.location.href,
             elements: elements
         };
-
-        return snapshot;
     }
 
     // Expose globally for evaluate calls

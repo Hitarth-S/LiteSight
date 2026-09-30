@@ -1,112 +1,137 @@
-# LiteSight — Architecture Specification
+# LiteSight: Architecture Specification
 
-## 1. Dual-Process Orchestration (Thinking Fast & Slow)
+Language: Simplified Technical English (STE)
 
-The system is split into a **High-Level Planner** (Heavy LLM) and a **Reactive Executor** (Lightweight Edge Model).
-
-- **The Slow Planner**: When a new domain is accessed, the heavy LLM (Groq Qwen 3.8-27b via LPU) generates a structured JSON array of sub-goals (e.g., `["locate_login", "enter_credentials", "verify_2fa"]`). It also injects Retrieval-Augmented Personalization (RAP) context from the local preference store.
-
-- **The Fast Executor**: The lightweight edge model operates in a closed loop, executing the current sub-goal using indexed DOM muscle memory and returning a `complete` or `failed` status within sub-500ms.
-
-- **The Handoff**: The Planner remains dormant to save compute, waking only when the Fast Executor returns a `failed` state indicating an unexpected layout, an empty DOM, or a `CanvasFallbackTrigger`.
-
-- **Context State Object (CSO)**: A rolling compressed session-memory is maintained by `src/state/cso_tracker.py`. On each Slow Planner call, only the minimal distilled context window (not the raw DOM) is injected, preventing token explosion across long-horizon tasks.
+This document describes the system architecture for LiteSight. LiteSight is a privacy-preserving browser agent built for the Smart India Hackathon (SIH).
 
 ---
 
-## 2. The Vision Layer: Foveated Tokenization
+## 1. High-Level Design
 
-To eliminate token explosion, the visual module abandons uniform grid patching and implements **foveated tokenization**, operating on the principle that a coarse view guides where to look, while selectively acquired high-resolution evidence refines what to think.
+The architecture contains two primary systems:
+1. **Client Device (Browser Extension or CLI Agent)**: Runs on the local user machine. It reads the screen, indexes interactive DOM elements, and redacts Personally Identifiable Information (PII) before any network transmission.
+2. **Centralized Reasoning Server (`server.py`)**: Receives only sanitized and anonymized data. It determines the next action and returns structured commands (`CLICK`, `TYPE_TEXT`, `SELECT`, `SCROLL_DOWN`) for the client to execute.
 
-- **Irregular Grid Processing**: The module extracts high-resolution patches centered strictly on the active interaction point and progressively downsamples surrounding patches on an irregular grid.
+```mermaid
+flowchart TD
+    subgraph Client ["Client Device (User Machine)"]
+        DOM["Live Web Page (DOM)"]
+        Indexer["DOM Indexer (snapshot.js)"]
+        Detector["PII Detector (detector.js)"]
+        Masker["Canvas Masker (canvas_masker.js)"]
+        Overlay["Visual Indicator Overlay (inspector_overlay.js)"]
+        ClientEngine["Browser Engine (engine.py / content.js)"]
+    end
 
-- **Bandwidth Optimization**: This approach preserves visual context while reducing the overall pixel and token count by roughly **24x** compared to traditional uniform inputs.
+    subgraph PrivacyGate ["Privacy Boundary (Zero Raw Egress)"]
+        Check{"Sensitive Data Check"}
+    end
 
-- **API Contract**: The Fast Executor passes a specific `(x, y)` coordinate (the foveation center) to the Vision API (`src/vision/foveation.py`), which returns the compressed foveated token array rather than a standard 1080p image tensor.
+    subgraph Server ["Centralized Server (server.py)"]
+        Endpoint["POST /api/step"]
+        Knowledge["UI Knowledge Base (ui_patterns.json)"]
+        Executor["Reactive Executor / Planner"]
+    end
 
-- **OmniVisualParser Fallback** (`src/vision/omni_parser.py`): When even the foveated VLM is unavailable, a pure NumPy/SciPy morphological edge detector with Non-Maximum Suppression (NMS) extracts discrete `[V1] button`, `[V2] textbox` indices directly from pixel buffers — zero DOM dependency, zero raw frame egress.
-
----
-
-## 3. The State Layer: MutationObserver Diffing
-
-The agent never captures back-to-back full-page DOM snapshots. The State Layer injects a native `MutationObserver` into the page context via Playwright, monitoring changes in a non-blocking manner.
-
-- **Configuration**: The observer tracks `childList` (for added/removed nodes), `attributes` (for state changes like `disabled` or `hidden`), and `characterData` (for text modifications).
-
-- **Batch Processing**: Instead of polling the DOM for changes, the agent passively listens for the callback function, which receives an array of `MutationRecord` objects detailing only what changed since the last action.
-
-- **Reconciliation**: The execution loop updates a local, lightweight state tree using these mutation records, ensuring the agent always acts on the current UI state with zero redundant parsing overhead.
-
----
-
-## 4. The Privacy Layer: WebGPU Synthetic Privacy Pipeline
-
-All visual frame egress passes through a mandatory local privacy pipeline **before** any data is sent to a cloud model.
-
-- **PII Detection** (`src/privacy/detector.js`): A WebGPU-accelerated kernel scans DOM and canvas frames for passwords, credit card numbers, government IDs, and face/avatar regions using local heuristic pattern recognition.
-
-- **Context-Preserving Synthetic Masking** (`src/privacy/canvas_masker.js`): Detected PII bounding boxes are replaced with stylized synthetic vector graphics — `[SYNTHETIC_CARD]`, standard avatar silhouettes, `🔒 ••••••••` — maintaining exact UI boundaries without opaque black boxes.
-
-- **Pipeline Orchestration** (`src/privacy/sanitizer.js`): The sanitizer composes detector → masker into a single atomic unit, guaranteeing no raw frame can bypass redaction.
-
-- **Zero-Trust Inspector** (`src/privacy/inspector_overlay.js`): A live in-browser HUD overlays real-time PII masking counts, DOM execution latency, and client RAM usage for transparent client-side attestation.
-
----
-
-## 5. The Federation Layer: Differential Privacy & Nightly LoRA
-
-- **Differential Privacy Engine** (`src/federation/differential_privacy.py`): Applies analytic Gaussian noise with configurable L2 clipping norm. Tracks cumulative privacy budget (ε, δ) per client session.
-
-- **Federated Client** (`src/federation/client.py`): Transforms verified daily trajectories into differentially private LoRA weight deltas. Uses deterministic SHA-256 hashing so no raw goal text or URL leaves the device.
-
-- **Nightly Scheduler** (`src/orchestrator/scheduler.py`): `NightlyLoRAScheduler` accumulates successful trajectories throughout the day and runs `FederatedClient.generate_privatized_update()` during off-peak hours to update edge model muscle memory.
+    DOM --> Indexer
+    DOM --> Detector
+    Detector --> Masker
+    Detector --> Overlay
+    Indexer --> Check
+    Masker --> Check
+    Check -- "Only Sanitized DOM & Masked Tokens" --> Endpoint
+    Endpoint --> Knowledge
+    Endpoint --> Executor
+    Executor -- "Action: CLICK, TYPE, SELECT, SCROLL" --> ClientEngine
+    ClientEngine --> DOM
+```
 
 ---
 
-## 6. The Multi-Agent Layer: Local Swarm Bus
+## 2. Component Specifications
 
-- **LocalMessageBus** (`src/orchestrator/bus.py`): Async in-memory pub/sub + request/response bus. Uses correlation IDs and `asyncio.Future` resolution — **no polling**, no network overhead, sub-millisecond latency.
+### A. Client Perception & DOM Indexing (`src/state/snapshot.js`)
+- The client extracts all visible, interactive DOM elements.
+- Each element receives an integer index (`[0]`, `[1]`, `[2]`), accessible ARIA role, HTML tag, and screen bounding box (`x, y, width, height`).
+- Associated form labels are extracted via four fallback strategies:
+  1. Native `label[for="id"]` mapping.
+  2. Direct `el.labels` collection.
+  3. Parent wrapping `<label>` text.
+  4. Sibling element text within the same input group.
 
-- **SwarmCoordinator** (`src/agents/swarm.py`): Orchestrates four specialized micro-agents:
-  - `DOMSensorAgent` — Maintains indexed element cache from MutationObserver streams.
-  - `PrivacySentinelAgent` — Pre-egress PII gatekeeper; raises `PIIRedactionFailure` on violation.
-  - `SpeculativeActionAgent` — Sub-500ms fast-path DOM action resolver using ARIA scoring.
-  - `VisualGroundingAgent` — OmniParser + foveation fallback for non-DOM targets.
+### B. On-Device Privacy Layer (`src/privacy/`)
+All DOM text and screen frames must pass through the on-device privacy layer before transmission:
+- **Detector (`src/privacy/detector.js`)**:
+  - Scans DOM inputs, leaf text nodes, and visual regions for sensitive data.
+  - Supports 6 PII categories:
+    1. `credit_cards`: 13 to 19 digit numbers with Luhn checksum validation.
+    2. `passwords`: Password fields, secret tokens, API keys.
+    3. `emails`: RFC 5322 email patterns.
+    4. `names`: Full names and labeled person name fields.
+    5. `phone_numbers`: International (E.164) and domestic phone formats.
+    6. `government_ids`: SSN and government identification numbers.
+  - Supports 3 sensitivity tiers:
+    - `Strict`: Flags all potential matches and high-entropy numeric identifiers.
+    - `Balanced` (Default): Combines structural attributes with regex patterns.
+    - `Relaxed`: Flags only confirmed credentials and financial cards.
+- **Visual Indicators (`src/privacy/inspector_overlay.js`)**:
+  - `👁️ MONITORED: [CATEGORY]`: Cyan dashed border on sensitive inputs under active observation.
+  - `🛡️ REDACTED: [CATEGORY]`: Emerald green border on inputs containing redacted data.
+  - Overlays use `pointer-events: none` on bounding boxes so user interactions are not blocked.
+- **Canvas Masker (`src/privacy/canvas_masker.js`)**:
+  - Draws synthetic vector boxes over sensitive pixels before image tokens leave the device.
+  - Replaces text with tokens such as `[REDACTED_PASSWORD]` or `[REDACTED_CREDIT_CARD]`.
+
+### C. Fast-Path Action Policy (`src/orchestrator/executor.py`)
+- Standard web actions execute in under 500ms using learned UI invariants ([`src/knowledge/ui_patterns.json`](src/knowledge/ui_patterns.json)).
+- The engine computes a match score for each candidate element:
+  $$\text{Score} = \text{Base Weight} + (4.0 \times \text{Keyword Match}) + (3.0 \times \text{Role Match}) + (2.0 \times \text{Tag Match})$$
+- Elements are verified against intent guards:
+  - Text actions (`TYPE_TEXT`, `TYPE_AND_SUBMIT`) target editable inputs only.
+  - Selection actions (`SELECT`) target `<select>`, `combobox`, or `listbox` elements.
+  - If a filter is not visible on screen, the engine returns `SCROLL_DOWN` instead of clicking unrelated links.
+
+### D. Centralized Reasoning Server (`server.py`)
+The server provides centralized reasoning via REST endpoints:
+- `POST /api/step`: Receives sanitized DOM elements and the current subgoal. Returns the next action command.
+- `POST /api/sanitize`: Sanitizes raw input text and returns redacted tokens.
+- `GET /api/settings`: Returns active sensitivity levels and enabled PII categories.
+- `POST /api/settings`: Updates sensitivity and category settings at runtime.
+- `GET /health`: Returns service health status and privacy audit flags.
+
+### E. Visual Fallback Engine (`src/vision/`)
+When the DOM is empty or elements reside in Canvas/WebGL:
+- **OmniVisualParser (`src/vision/omni_parser.py`)**: Uses morphological edge detection and Non-Maximum Suppression (NMS) to detect interactive elements directly from pixel arrays.
+- **FoveatedTokenizer (`src/vision/foveation.py`)**: Extracts a high-resolution crop around the target coordinate and downsamples the surrounding area, reducing visual tokens by 24x.
 
 ---
 
-## 7. AI Agent Implementation Contracts & Machine Specs
+## 3. Data Flow & Communication
 
-> **Note for AI Coding Agents:** When implementing or refactoring modules in this repository, you MUST adhere strictly to the file paths, JSON schemas, and exception classes defined below. Do not create unmapped helper files or change payload key names.
-
-### A. Code Base File Structure & Responsibility Map
-
-| Module Path | Primary Responsibility | Input Type | Output Type |
-| :--- | :--- | :--- | :--- |
-| `src/privacy/detector.js` | WebGPU YOLOv8 + Wasm OCR execution | `HTMLVideoElement` / `ImageBitmap` | `Array<PIIBoundingBox>` |
-| `src/privacy/canvas_masker.js` | Canvas synthetic SVG vector overlay | `ImageBitmap`, `Array<PIIBoundingBox>` | `Blob` (PNG/WebP Frame) |
-| `src/privacy/sanitizer.js` | End-to-end frame sanitization pipeline | Raw frame | Sanitized `Blob` |
-| `src/state/snapshot.js` | Fast-path indexed DOM tree extractor | `Document` / `DOM Node` | `IndexedDOMState` (JSON) |
-| `src/state/observer.js` | Asynchronous MutationObserver listener | DOM Mutation Events | `MutationRecord` stream |
-| `src/state/cso_tracker.py` | Rolling compressed session memory | Session events | Distilled context JSON |
-| `src/state/personalization.py` | Local preference retrieval (RAP) | User profile store | Context injection dict |
-| `src/vision/foveation.py` | PyTorch irregular grid foveation crop | `Tensor` (Full Image), `TargetCoord` | `Tensor` (Compressed Tokens) |
-| `src/vision/omni_parser.py` | Pure visual UI component detection | `np.ndarray` / `Tensor` | `List[VisualElement]` |
-| `src/orchestrator/executor.py` | Fast/Slow process action loop & guard | `IndexedDOMState`, `GoalString` | `ActionPayload` |
-| `src/orchestrator/bus.py` | In-memory async multi-agent message bus | Topic + payload | Correlated response |
-| `src/orchestrator/scheduler.py` | Nightly LoRA fine-tuning scheduler | Trajectory buffer | `FederatedWeightPayload` |
-| `src/agents/swarm.py` | Four-agent swarm coordinator | `DOMSnapshot`, `PrivacyReport` | `ActionDecision` |
-| `src/federation/differential_privacy.py` | Gaussian noise DP engine | Raw weight delta | Privatized delta + budget |
-| `src/federation/client.py` | Federated LoRA update generator | Trajectory list | `FederatedWeightPayload` |
-| `src/browser/engine.py` | Playwright browser controller + guards | `ActionPayload` | Execution result |
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Extension as Browser Extension (Client)
+    participant Privacy as Privacy Kernel (On-Device)
+    participant Server as Centralized Server (server.py)
+    
+    User->>Extension: Enter goal: "login using username -> admin, password -> admin"
+    Extension->>Privacy: Scan DOM for PII
+    Privacy->>Privacy: Redact passwords and sensitive fields
+    Privacy-->>Extension: Return sanitized DOM state
+    Extension->>Server: POST /api/step (sanitized DOM only)
+    Server->>Server: Resolve intent using ui_patterns.json
+    Server-->>Extension: Return Action: {"operation": "TYPE_TEXT", "target_index": 5, "text_value": "admin"}
+    Extension->>Extension: Execute action in active tab
+```
 
 ---
 
-### B. Machine Schemas & Type Contracts
+## 4. Machine Data Schemas
 
-#### 1. Fast-Path Indexed DOM State Schema (`src/state/snapshot.js`)
-AI agents generating snapshot code must emit JSON strictly matching this schema:
+### A. Indexed DOM Snapshot Schema (`src/state/snapshot.js`)
+
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -144,8 +169,8 @@ AI agents generating snapshot code must emit JSON strictly matching this schema:
 }
 ```
 
-#### 2. Server Action Response Schema (`src/orchestrator/executor.py`)
-AI agents building server-side models must format responses strictly as:
+### B. Server Action Command Schema (`server.py`)
+
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -153,9 +178,10 @@ AI agents building server-side models must format responses strictly as:
   "properties": {
     "operation": {
       "type": "string",
-      "enum": ["CLICK", "TYPE_TEXT", "SELECT", "SCROLL_UP", "SCROLL_DOWN", "WAIT", "FALLBACK_TO_VISION", "DONE"]
+      "enum": ["CLICK", "TYPE_TEXT", "TYPE_AND_SUBMIT", "SELECT", "SCROLL_UP", "SCROLL_DOWN", "WAIT", "EXTRACT_AND_ANSWER", "DONE"]
     },
     "target_index": { "type": ["integer", "null"] },
+    "target_label": { "type": ["string", "null"] },
     "text_value": { "type": ["string", "null"] },
     "reasoning_summary": { "type": "string" }
   },
@@ -163,28 +189,54 @@ AI agents building server-side models must format responses strictly as:
 }
 ```
 
+### C. Privacy Configuration Schema (`src/state/sanitizer.py`, `server.py`)
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "sensitivity": {
+      "type": "string",
+      "enum": ["strict", "balanced", "relaxed"]
+    },
+    "categories": {
+      "type": "object",
+      "properties": {
+        "credit_cards": { "type": "boolean" },
+        "passwords": { "type": "boolean" },
+        "emails": { "type": "boolean" },
+        "names": { "type": "boolean" },
+        "phone_numbers": { "type": "boolean" },
+        "government_ids": { "type": "boolean" }
+      }
+    },
+    "visual_indicators": { "type": "boolean" }
+  },
+  "required": ["sensitivity", "categories"]
+}
+```
+
 ---
 
-### C. Required Exceptions & Error Handling Class Hierarchy
-AI agents MUST import and raise these exact custom exception classes located in `src/orchestrator/exceptions.py`:
-```python
-class LiteSightBaseException(Exception):
-    """Base exception for all LiteSight runtime errors."""
-    pass
+## 5. Error Handling & Custom Exceptions
 
-class StaleNodeException(LiteSightBaseException):
-    """Raised when target_index is no longer present in current DOM tree."""
-    pass
+Modules raise custom exceptions from [`src/orchestrator/exceptions.py`](src/orchestrator/exceptions.py):
 
-class ElementObscuredError(LiteSightBaseException):
-    """Raised when target element is covered by overlay/modal or zero-width."""
-    pass
+| Exception | Cause | System Response |
+| :--- | :--- | :--- |
+| `PIIRedactionFailure` | Privacy kernel detects unmasked sensitive data | Aborts network transmission immediately. |
+| `StaleNodeException` | Target index no longer exists in DOM | Triggers fresh DOM snapshot and re-evaluates. |
+| `ElementObscuredError` | Target element is covered by modal or zero-width | Closes modal overlay or scrolls element into view. |
+| `CanvasFallbackTrigger` | Target element is inside `<canvas>` or WebGL | Diverts to OmniParser visual coordinate fallback. |
 
-class CanvasFallbackTrigger(LiteSightBaseException):
-    """Raised when action target resides within non-indexed <canvas> or WebGL context."""
-    pass
+---
 
-class PIIRedactionFailure(LiteSightBaseException):
-    """Raised if WebGPU privacy kernel fails frame sanitization prior to egress."""
-    pass
-```
+## 6. Security Invariants
+
+1. **Zero Raw Egress**: Raw passwords, card numbers, and full-resolution unredacted frames never cross network boundaries.
+2. **Safe DOM Text Extraction**: The DOM scanner uses `textContent` instead of `innerText` to prevent synchronous reflows and layout freezing.
+3. **Escaped Selectors**: Dynamic DOM queries use `CSS.escape(String(index))` to prevent selector injection attacks.
+4. **Bounded Request Body**: The server enforces a 10 MB payload limit (`MAX_PAYLOAD_BYTES`) and returns HTTP 413 for oversized requests.
+5. **URL Protocol Restriction**: Only `http://` and `https://` schemes are accepted. Protocols like `file://` and `javascript:` are rejected.
+6. **Task Reference Tracking**: Asynchronous background tasks are retained in explicit reference sets to avoid garbage collection errors during execution.

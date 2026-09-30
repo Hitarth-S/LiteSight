@@ -1,4 +1,4 @@
-// src/privacy/detector.js
+// extension/detector.js
 /**
  * On-Device PII Detector & Sensitivity Classifier.
  * Executes WebGPU YOLOv8-Nano / Wasm OCR inference with deterministic visual & DOM heuristics.

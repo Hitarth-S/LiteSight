@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiteSight Sentinel</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #131b2e;
+      --border: #22304d;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --success: #22c55e;
+      --warning: #facc15;
+      --danger: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body {
+      width: 380px;
+      background: var(--bg);
+      color: var(--text);
+      padding: 14px;
+      font-size: 13px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 15px;
+      color: #fff;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+    }
+
+    /* Tab Navigation */
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+      background: #0d1322;
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+    .tab-btn.active {
+      color: #fff;
+      background: var(--card-bg);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .metric-title {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .metric-val {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .form-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    textarea, input, select {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      padding: 8px 10px;
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea:focus, input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+    .btn-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    button.action-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+    .btn-secondary {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      background: #1e293b;
+    }
+    .log-box {
+      margin-top: 12px;
+      background: #050811;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #38bdf8;
+      max-height: 100px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Privacy Settings Styling */
+    .settings-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 12px 0 6px 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .sensitivity-desc {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .category-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .category-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.15s;
+    }
+    .category-item:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+    .category-item label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #e2e8f0;
+      margin-bottom: 0;
+      cursor: pointer;
+      text-transform: none;
+      letter-spacing: normal;
+    }
+    .category-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-top: 8px;
+    }
+    .switch-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .switch-desc {
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .status-msg {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--success);
+      font-weight: 500;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <span>🛡️ LiteSight Sentinel</span>
+    </div>
+    <div class="badge">
+      <span class="dot"></span> WebGPU On-Device
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-btn-agent">Automation Agent</button>
+    <button class="tab-btn" id="tab-btn-privacy">Privacy Settings</button>
+  </div>
+
+  <!-- TAB 1: Automation Agent -->
+  <div class="tab-content active" id="tab-agent">
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-title">PII Redacted</div>
+        <div class="metric-val" style="color: var(--success);" id="metric-pii">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">Fields Monitored</div>
+        <div class="metric-val" style="color: var(--accent);" id="metric-monitored">0</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Autonomous Subgoal / Intent</label>
+      <textarea id="goal-input" rows="2" placeholder="e.g. search for 'mechanical keyboard' and add to cart">search for 'ergonomic mechanical keyboard'</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Server Reasoning Endpoint</label>
+      <input type="text" id="server-url" value="http://localhost:8000">
+    </div>
+
+    <div class="btn-row">
+      <button class="action-btn btn-primary" id="btn-step">Execute Step</button>
+      <button class="action-btn btn-secondary" id="btn-hud">Toggle HUD</button>
+    </div>
+
+    <div class="log-box" id="log-console">[LiteSight] Ready. On-Device WebGPU Sentinel guarding context.</div>
+  </div>
+
+  <!-- TAB 2: Privacy Settings -->
+  <div class="tab-content" id="tab-privacy">
+    <div class="settings-section-title">Sensitivity Level</div>
+    <select id="setting-sensitivity">
+      <option value="strict">Strict (Maximum Redaction - High Heuristics)</option>
+      <option value="balanced" selected>Balanced (Standard Protection - Default)</option>
+      <option value="relaxed">Relaxed (Credentials & Cards Only)</option>
+    </select>
+    <div class="sensitivity-desc" id="sensitivity-explanation">
+      Standard protection. Actively scans credentials, cards, emails, names, phone numbers, and IDs.
+    </div>
+
+    <div class="settings-section-title">Scanned & Redacted Categories</div>
+    <div class="category-list">
+      <div class="category-item">
+        <label for="cat-credit-cards"><span>💳 Credit Cards & Financials</span></label>
+        <input type="checkbox" id="cat-credit-cards" checked>
+      </div>
+      <div class="category-item">
+        <label for="cat-passwords"><span>🔑 Passwords & Secret Tokens</span></label>
+        <input type="checkbox" id="cat-passwords" checked>
+      </div>
+      <div class="category-item">
+        <label for="cat-emails"><span>✉️ Email Addresses</span></label>
+        <input type="checkbox" id="cat-emails" checked>
+      </div>
+      <div class="category-item">
+        <label for="cat-names"><span>👤 Personal Names</span></label>
+        <input type="checkbox" id="cat-names" checked>
+      </div>
+      <div class="category-item">
+        <label for="cat-phones"><span>📞 Phone Numbers</span></label>
+        <input type="checkbox" id="cat-phones" checked>
+      </div>
+      <div class="category-item">
+        <label for="cat-gov-ids"><span>🆔 Government IDs / SSN</span></label>
+        <input type="checkbox" id="cat-gov-ids" checked>
+      </div>
+    </div>
+
+    <div class="settings-section-title">Visual Feedback</div>
+    <div class="switch-row">
+      <div>
+        <div class="switch-label">In-Page Visual Indicators</div>
+        <div class="switch-desc">Show subtle overlays on monitored & redacted fields</div>
+      </div>
+      <input type="checkbox" id="setting-visual-indicators" checked>
+    </div>
+
+    <div class="status-msg" id="settings-save-status">✓ Settings synced to active tab & on-device detector</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

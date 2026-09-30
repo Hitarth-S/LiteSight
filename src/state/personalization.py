@@ -1,6 +1,7 @@
 # src/state/personalization.py
 import json
 import os
+from urllib.parse import urlparse
 
 class RetrievalAugmentedPersonalization:
     """
@@ -17,7 +18,7 @@ class RetrievalAugmentedPersonalization:
             try:
                 with open(self.db_path, "r") as f:
                     return json.load(f)
-            except Exception:
+            except (FileNotFoundError, json.JSONDecodeError, OSError):
                 return []
         # Seed with some dummy personalizations
         return [
@@ -28,8 +29,12 @@ class RetrievalAugmentedPersonalization:
     def retrieve_preferences(self, current_url: str) -> list:
         """Retrieves preferences relevant to the current context."""
         relevant = []
+        try:
+            current_domain = urlparse(current_url).netloc.lower()
+        except (ValueError, AttributeError):
+            current_domain = ""
         for pref in self.preferences:
-            if pref["domain"] == "any" or pref["domain"] in current_url:
+            if pref["domain"] == "any" or current_domain.endswith(pref["domain"].lower()):
                 relevant.append(pref["preference"])
         return relevant
         
