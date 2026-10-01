@@ -40,6 +40,10 @@ class RetrievalAugmentedPersonalization:
         
     def learn_preference(self, domain: str, preference: str):
         """Called by the Nightly LoRA scheduler to add new verified preferences."""
-        self.preferences.append({"domain": domain, "preference": preference})
-        with open(self.db_path, "w") as f:
-            json.dump(self.preferences, f)
+        if not any(p.get("domain") == domain and p.get("preference") == preference for p in self.preferences):
+            self.preferences.append({"domain": domain, "preference": preference})
+            try:
+                with open(self.db_path, "w", encoding="utf-8") as f:
+                    json.dump(self.preferences, f, indent=2)
+            except OSError:
+                pass

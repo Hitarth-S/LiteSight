@@ -148,9 +148,14 @@ class LiteSightServerHandler(BaseHTTPRequestHandler):
             history = payload.get("history", [])
 
             # Normalize element IDs to indexes if provided from content candidates
-            for el in elements:
-                if "index" not in el and "id" in el:
-                    el["index"] = el["id"]
+            clean_elements = []
+            if isinstance(elements, list):
+                for el in elements:
+                    if isinstance(el, dict):
+                        if "index" not in el and "id" in el:
+                            el["index"] = el["id"]
+                        clean_elements.append(el)
+            elements = clean_elements
 
             action = SERVER_EXECUTOR._resolve_fast_path_action(goal, elements)
             if not action:

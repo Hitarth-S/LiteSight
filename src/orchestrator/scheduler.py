@@ -60,6 +60,6 @@ class NightlyLoRAScheduler:
 
     def trigger_manual_nightly_job(self):
         """Allows testing the nightly job asynchronously in a worker thread."""
-        thread = threading.Thread(target=self.run_nightly_job)
+        thread = threading.Thread(target=self.run_nightly_job, daemon=True)
         thread.start()
         return thread

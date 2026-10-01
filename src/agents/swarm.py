@@ -157,7 +157,7 @@ class SpeculativeActionAgent:
         ])
         if is_auth_intro:
             has_login_fields = any(
-                el.get("is_visible") and (el.get("role") in ["textbox", "combobox"] or el.get("tag") in ["input", "select"])
+                el.get("is_visible", True) and (el.get("role") in ["textbox", "combobox"] or el.get("tag") in ["input", "select"])
                 and any(auth in el.get("label", "").lower() for auth in ["username", "email", "password", "role"])
                 for el in elements
             )
@@ -301,7 +301,7 @@ class SpeculativeActionAgent:
         best_candidate = None
 
         for el in elements:
-            if not el.get("is_visible"):
+            if not el.get("is_visible", True):
                 continue
             box = el.get("bounding_box", {})
             if box.get("width", 0) <= 0 or box.get("height", 0) <= 0:

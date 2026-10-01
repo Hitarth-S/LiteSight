@@ -464,6 +464,7 @@
                 label: label,
                 value: value,
                 is_sensitive: isSensitive,
+                is_visible: true,
                 x: Math.round(rect.left + rect.width / 2),
                 y: Math.round(rect.top + rect.height / 2),
                 bounding_box: {

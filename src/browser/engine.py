@@ -11,7 +11,7 @@ import time
 import asyncio
 from pathlib import Path
 import io
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 from PIL import Image
 import numpy as np
 import playwright.async_api as pw
@@ -432,7 +432,7 @@ class BrowserEngine:
 
         # Guard 1: Freshness check with dynamic label fallback
         try:
-            element_handle = await self.page.query_selector(f'[data-litesight-index="{target_index}"]')
+            element_handle = await self.page.query_selector(f'[data-litesight-index="{target_index}"], [data-ls-id="{target_index}"]')
             if not element_handle and label:
                 # Fallback: re-query dynamically mounted/re-rendered element by text/label
                 escaped = label.replace('"', '\\"').strip()
@@ -539,7 +539,7 @@ class BrowserEngine:
                 await asyncio.sleep(0.1)  # Brief yield for SPA focus events
 
                 # Step 2: Re-query element by index.
-                fresh_handle = await self.page.query_selector(f'[data-litesight-index="{target_index}"]')
+                fresh_handle = await self.page.query_selector(f'[data-litesight-index="{target_index}"], [data-ls-id="{target_index}"]')
 
                 try:
                     if fresh_handle:
@@ -665,6 +665,12 @@ class BrowserEngine:
             await asyncio.sleep(0.2)
             await self.page.keyboard.type(text_value or "", delay=40)
             await asyncio.sleep(0.4)
+        elif operation in ["SCROLL_DOWN", "SCROLL_UP"]:
+            scroll_delta = 600 if operation == "SCROLL_DOWN" else -600
+            await self.page.mouse.move(x, y)
+            await self.page.mouse.wheel(0, scroll_delta)
+        elif operation == "WAIT":
+            await asyncio.sleep(1.5)
 
         elapsed_ms = int((time.time() - start_time) * 1000)
         await self._update_inspector_hud(f"{operation} ({x},{y})", elapsed_ms)

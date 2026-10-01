@@ -178,17 +178,33 @@ class OmniVisualParser:
 
     def _calculate_iou(self, box_a: Dict[str, Any], box_b: Dict[str, Any]) -> float:
         """Calculates Intersection-Over-Union between two boxes."""
-        x1 = max(box_a["x"], box_b["x"])
-        y1 = max(box_a["y"], box_b["y"])
-        x2 = min(box_a["x"] + box_a["width"], box_b["x"] + box_b["width"])
-        y2 = min(box_a["y"] + box_a["height"], box_b["y"] + box_b["height"])
+        def _get_coords(b: Dict[str, Any]) -> Tuple[float, float, float, float]:
+            if "x" in b and "y" in b and "width" in b and "height" in b:
+                return float(b["x"]), float(b["y"]), float(b["width"]), float(b["height"])
+            if "bbox" in b and isinstance(b["bbox"], (list, tuple)) and len(b["bbox"]) >= 4:
+                return float(b["bbox"][0]), float(b["bbox"][1]), float(b["bbox"][2]), float(b["bbox"][3])
+            if "bounding_box" in b and isinstance(b["bounding_box"], dict):
+                bb = b["bounding_box"]
+                return float(bb.get("x", 0)), float(bb.get("y", 0)), float(bb.get("width", 0)), float(bb.get("height", 0))
+            return float(b.get("x", 0)), float(b.get("y", 0)), float(b.get("width", 0)), float(b.get("height", 0))
 
-        inter_w = max(0, x2 - x1)
-        inter_h = max(0, y2 - y1)
+        ax, ay, aw, ah = _get_coords(box_a)
+        bx, by, bw, bh = _get_coords(box_b)
+
+        if aw <= 0 or ah <= 0 or bw <= 0 or bh <= 0:
+            return 0.0
+
+        x1 = max(ax, bx)
+        y1 = max(ay, by)
+        x2 = min(ax + aw, bx + bw)
+        y2 = min(ay + ah, by + bh)
+
+        inter_w = max(0.0, x2 - x1)
+        inter_h = max(0.0, y2 - y1)
         inter_area = inter_w * inter_h
 
-        area_a = box_a["width"] * box_a["height"]
-        area_b = box_b["width"] * box_b["height"]
+        area_a = aw * ah
+        area_b = bw * bh
         union_area = area_a + area_b - inter_area
 
         if union_area <= 0:
