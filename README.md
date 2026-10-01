@@ -1,9 +1,9 @@
 # 🛡️ LiteSight: Privacy-Preserving On-Device Agentic AI
 
-[![Smart India Hackathon](https://img.shields.io/badge/SIH-Compliant%20Solution-blue?style=for-the-badge&logo=target)](https://github.com/Hitarth-S/LiteSight)
+<!-- [![Smart India Hackathon](https://img.shields.io/badge/SIH-Compliant%20Solution-blue?style=for-the-badge&logo=target)](https://github.com/Hitarth-S/LiteSight)
 [![WebGPU Privacy Sentinel](https://img.shields.io/badge/WebGPU-PII%20Redaction%20Active-green?style=for-the-badge&logo=webgpu)](src/privacy/)
 [![Verhoeff Aadhaar Checksum](https://img.shields.io/badge/Verhoeff-Aadhaar%20%26%20PAN%20Guarded-teal?style=for-the-badge)](src/privacy/detector.js)
-[![Tested End-to-End](https://img.shields.io/badge/Tests-40%2F40%20Passing-brightgreen?style=for-the-badge)](tests/)
+[![Tested End-to-End](https://img.shields.io/badge/Tests-40%2F40%20Passing-brightgreen?style=for-the-badge)](tests/) -->
 
 **LiteSight** is an edge-native, privacy-preserving browser automation system. It runs lightweight perception and data sanitization directly inside the client browser.
 
