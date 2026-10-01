@@ -551,9 +551,12 @@
 
             if (operation === "CLICK") {
                 targetEl.focus();
+                await new Promise(r => setTimeout(r, 250)); // Deliberate focus pacing matching CLI
                 targetEl.click();
+                await new Promise(r => setTimeout(r, 350)); // Settle pause after click
             } else if (operation === "SELECT") {
                 targetEl.focus();
+                await new Promise(r => setTimeout(r, 200));
                 const val = (textValue || "").trim().toLowerCase();
                 let matched = false;
                 if (targetEl.options && targetEl.options.length > 0) {
@@ -575,20 +578,52 @@
                 } else {
                     targetEl.click();
                 }
+                await new Promise(r => setTimeout(r, 250));
             } else if (operation === "TYPE_TEXT" || operation === "TYPE_AND_SUBMIT") {
                 targetEl.focus();
-                targetEl.value = textValue || "";
+                await new Promise(r => setTimeout(r, 150)); // Focus yield matching CLI
+                targetEl.value = "";
                 targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+
+                // Human-paced typing delay matching CLI (delay=65ms per character)
+                const fullText = textValue || "";
+                for (let i = 0; i < fullText.length; i++) {
+                    const char = fullText[i];
+                    targetEl.value += char;
+                    targetEl.dispatchEvent(new KeyboardEvent('keydown', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true }));
+                    targetEl.dispatchEvent(new KeyboardEvent('keypress', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true }));
+                    targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    targetEl.dispatchEvent(new KeyboardEvent('keyup', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true }));
+                    await new Promise(r => setTimeout(r, 65)); // 65ms per character matches CLI delay=65
+                }
                 targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+                await new Promise(r => setTimeout(r, 150)); // Brief pause before enter/submit
 
                 if (operation === "TYPE_AND_SUBMIT") {
-                    await new Promise(r => setTimeout(r, 200));
-                    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
-                    targetEl.dispatchEvent(enterEvent);
+                    await new Promise(r => setTimeout(r, 250));
+                    // 1. Dispatch full keyboard Enter cycle
+                    ['keydown', 'keypress', 'keyup'].forEach(type => {
+                        targetEl.dispatchEvent(new KeyboardEvent(type, {
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true,
+                            cancelable: true
+                        }));
+                    });
+
+                    // 2. Locate and click associated submit button if present (Amazon #nav-search-submit-button, etc.)
                     const form = targetEl.closest('form');
-                    if (form && typeof form.requestSubmit === 'function') {
+                    const submitBtn = (form && form.querySelector('input[type="submit"], button[type="submit"], #nav-search-submit-button, [aria-label*="search" i], [title*="search" i]')) ||
+                        document.querySelector('#nav-search-submit-button, input[type="submit"].nav-input');
+
+                    if (submitBtn) {
+                        try { submitBtn.click(); } catch (_) {}
+                    } else if (form && typeof form.requestSubmit === 'function') {
                         try { form.requestSubmit(); } catch (_) {}
                     }
+                    await new Promise(r => setTimeout(r, 400));
                 }
             }
 

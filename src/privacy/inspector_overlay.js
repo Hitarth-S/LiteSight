@@ -95,97 +95,18 @@
         }
 
         mount() {
-            if (document.getElementById('litesight-inspector-root')) return;
-
-            const root = document.createElement('div');
-            root.id = 'litesight-inspector-root';
-            root.style.cssText = `
-                position: fixed;
-                bottom: 12px;
-                right: 12px;
-                width: 480px;
-                max-height: 360px;
-                background: rgba(15, 23, 42, 0.95);
-                backdrop-filter: blur(10px);
-                border: 1px solid #38bdf8;
-                border-radius: 8px;
-                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-                z-index: 2147483647;
-                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-                color: #f8fafc;
-                font-size: 11px;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            `;
-
-            root.innerHTML = `
-                <div style="background: #0f172a; padding: 6px 12px; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 6px; font-weight: bold; color: #38bdf8;">
-                        <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%;"></span>
-                        LiteSight Dual-Pane Privacy & Action Inspector
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <span id="ls-metric-sensitivity" style="color: #facc15; font-size: 9px; border: 1px solid #eab308; border-radius: 3px; padding: 1px 4px;">BALANCED</span>
-                        <span id="ls-metric-ram" style="color: #94a3b8; font-size: 10px;">RAM: &lt;480MB</span>
-                    </div>
-                </div>
-                <div style="display: flex; flex: 1; padding: 8px; gap: 8px; height: 180px;">
-                    <div style="flex: 1; display: flex; flex-direction: column; border: 1px solid #334155; border-radius: 4px; padding: 4px; background: #020617;">
-                        <span style="color: #94a3b8; font-size: 9px; margin-bottom: 4px; text-transform: uppercase;">Live User View</span>
-                        <div id="ls-live-preview" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f172a; color: #64748b; font-size: 10px; border-radius: 2px; text-align: center; padding: 4px;">
-                            <span>Active DOM Session</span>
-                            <span id="ls-live-stats" style="color: #38bdf8; font-size: 9px; margin-top: 4px;">Monitoring Active</span>
-                        </div>
-                    </div>
-                    <div style="flex: 1; display: flex; flex-direction: column; border: 1px solid #0284c7; border-radius: 4px; padding: 4px; background: #020617;">
-                        <span style="color: #38bdf8; font-size: 9px; margin-bottom: 4px; text-transform: uppercase;">Sanitized Server View</span>
-                        <div id="ls-sanitized-preview" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f172a; color: #38bdf8; font-size: 10px; border-radius: 2px; text-align: center; padding: 4px;">
-                            <span id="ls-sanitized-text">🛡️ PII Masked (WebGPU)</span>
-                            <span id="ls-sanitized-sub" style="color: #22c55e; font-size: 9px; margin-top: 4px;">Zero Raw Egress</span>
-                        </div>
-                    </div>
-                </div>
-                <div style="background: #0f172a; border-top: 1px solid #1e293b; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center;">
-                    <span id="ls-current-action" style="color: #facc15; font-weight: 500;">Action: STANDBY</span>
-                    <span id="ls-latency" style="color: #a855f7;">Fast-Path: -- ms</span>
-                </div>
-            `;
-
-            const targetParent = document.body || document.documentElement;
-            if (targetParent) {
-                targetParent.appendChild(root);
-                this.container = root;
-            }
+            // Disabled: Bottom-right dual pane window removed per user configuration
+            const existing = document.getElementById('litesight-inspector-root');
+            if (existing) existing.remove();
+            this.container = null;
         }
 
         updateAction(actionStr, latencyMs = 0) {
-            this.mount();
-            const actionEl = document.getElementById('ls-current-action');
-            const latencyEl = document.getElementById('ls-latency');
-            if (actionEl) actionEl.innerText = `Action: ${actionStr}`;
-            if (latencyEl && latencyMs > 0) latencyEl.innerText = `Fast-Path: ${latencyMs}ms`;
+            // Dual-pane HUD disabled
         }
 
         updateSanitizedStats(detectedCount = 0, monitoredCount = 0, redactedCount = 0, sensitivity = "BALANCED") {
-            this.mount();
-            const previewText = document.getElementById('ls-sanitized-text');
-            const previewSub = document.getElementById('ls-sanitized-sub');
-            const liveStats = document.getElementById('ls-live-stats');
-            const sensBadge = document.getElementById('ls-metric-sensitivity');
-
-            if (previewText) {
-                previewText.innerHTML = `🛡️ ${redactedCount} Redacted | 👁️ ${monitoredCount} Monitored`;
-            }
-            if (previewSub) {
-                previewSub.innerText = `${detectedCount} PII Region(s) Managed`;
-            }
-            if (liveStats) {
-                liveStats.innerText = `${monitoredCount} Fields Actively Guarded`;
-            }
-            if (sensBadge && sensitivity) {
-                sensBadge.innerText = String(sensitivity).toUpperCase();
-            }
+            // Dual-pane HUD disabled
         }
 
         /**
