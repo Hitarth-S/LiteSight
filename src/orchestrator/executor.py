@@ -788,7 +788,7 @@ Example: {"plan": ["type 'mechanical keyboard' into search bar and submit | Keyw
 
         try:
             import os
-            groq_model = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+            groq_model = os.environ.get("GROQ_MODEL", "qwen/qwen3.8-27b")
             print(f"[Planner] Querying Groq Heavy LLM ({groq_model}) to decompose goal into subgoals...")
             response = await self.client.chat.completions.create(
                 model=groq_model,

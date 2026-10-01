@@ -32,7 +32,7 @@ class JevTypedPolicy:
 
     def __init__(self, slm_client: Optional[Any] = None, slm_model: Optional[str] = None):
         self.slm_client = slm_client
-        self.slm_model = slm_model or os.environ.get("LITESIGHT_SLM_MODEL", "llama-3.3-70b-versatile")
+        self.slm_model = slm_model or os.environ.get("LITESIGHT_SLM_MODEL", os.environ.get("GROQ_MODEL", "qwen/qwen3.8-27b"))
         self.last_search_query = None
 
     def decide_action(
