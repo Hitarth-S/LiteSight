@@ -86,16 +86,29 @@ class LiteSightServerHandler(BaseHTTPRequestHandler):
             elements = payload.get("elements", [])
             pii_count = payload.get("pii_count", 0)
 
+            # Normalize element IDs to indexes if provided from content candidates
+            if isinstance(elements, list):
+                for el in elements:
+                    if isinstance(el, dict) and "index" not in el and "id" in el:
+                        el["index"] = el["id"]
+
+            # If incoming subgoal is composite, decompose and extract the active atomic subgoal
+            from src.orchestrator.executor import HighLevelPlanner
+            planner = HighLevelPlanner()
+            subgoals = planner._fallback_decompose_goal(subgoal)
+            active_subgoal = subgoals[0] if (subgoals and len(subgoals) > 1) else subgoal
+
             # Security Sentinel: Verify that no raw sensitive credentials leaked in values
             leaked_pii = False
             for el in elements:
-                val = str(el.get("value", "")).lower()
-                if any(kw in val for kw in ["password", "cvv", "credit_card"]):
-                    leaked_pii = True
-                    el["value"] = "[REDACTED_BY_SERVER_SENTINEL]"
+                if isinstance(el, dict):
+                    val = str(el.get("value", "")).lower()
+                    if any(kw in val for kw in ["password", "cvv", "credit_card"]):
+                        leaked_pii = True
+                        el["value"] = "[REDACTED_BY_SERVER_SENTINEL]"
 
             # Use server-level ReactiveExecutor instance for action planning
-            action = SERVER_EXECUTOR._resolve_fast_path_action(subgoal, elements)
+            action = SERVER_EXECUTOR._resolve_fast_path_action(active_subgoal, elements)
 
             if not action:
                 # Default fallback action
@@ -115,6 +128,8 @@ class LiteSightServerHandler(BaseHTTPRequestHandler):
                 "target_label": action.get("target_label"),
                 "text_value": action.get("text_value"),
                 "reasoning": action.get("reasoning_summary"),
+                "active_subgoal": active_subgoal,
+                "remaining_subgoals": subgoals[1:] if len(subgoals) > 1 else [],
                 "latency_ms": latency_ms,
                 "privacy_audit": {
                     "client_pii_redacted": pii_count,

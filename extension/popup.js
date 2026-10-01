@@ -9,12 +9,19 @@ document.addEventListener("DOMContentLoaded", () => {
     // Agent view elements
     const goalInput = document.getElementById("goal-input");
     const serverUrlInput = document.getElementById("server-url");
+    const btnRun = document.getElementById("btn-run");
     const btnStep = document.getElementById("btn-step");
     const btnPreview = document.getElementById("btn-preview");
     const btnHud = document.getElementById("btn-hud");
     const logConsole = document.getElementById("log-console");
     const metricPii = document.getElementById("metric-pii");
     const metricMonitored = document.getElementById("metric-monitored");
+
+    // Autonomous execution state
+    let _planQueue = [];
+    let _currentStepNumber = 0;
+    let _totalSteps = 0;
+    let _isRunning = false;
 
     // Redaction panel elements
     const redactPanel = document.getElementById("redactPanel");
@@ -257,64 +264,147 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    btnStep.addEventListener("click", async () => {
-        const goal = goalInput.value.trim();
-        const serverUrl = serverUrlInput.value.trim();
-        if (!goal) return;
+    function decomposeGoal(goalStr) {
+        if (!goalStr) return [];
+        if (goalStr.includes(',') || goalStr.includes(';') || /\s+and\s+/i.test(goalStr) || /\s+then\s+/i.test(goalStr)) {
+            const raw = goalStr.split(/[,;]|\s+and\s+|\s+then\s+/i);
+            return raw.map(s => s.replace(/^(?:and|then)\s+/i, '').trim()).filter(Boolean);
+        }
+        return [goalStr];
+    }
 
-        btnStep.disabled = true;
-        log(`[Step] Ingesting goal: "${goal}"`);
-
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (!tabs[0]) {
-                btnStep.disabled = false;
-                return;
-            }
-            const activeTabId = tabs[0].id;
-
-            // 1. Get Sanitized DOM State from Content Script
-            chrome.tabs.sendMessage(activeTabId, { action: "GET_PAGE_STATE" }, async (state) => {
+    async function executeSingleStep(subgoal, activeTabId, serverUrl) {
+        return new Promise((resolve) => {
+            chrome.tabs.sendMessage(activeTabId, { action: "GET_PAGE_STATE" }, (state) => {
                 if (chrome.runtime.lastError || !state) {
                     log("[Error] Cannot reach page content script. Reload page.");
-                    btnStep.disabled = false;
+                    resolve({ success: false });
                     return;
                 }
 
                 if (metricPii) metricPii.textContent = state.redacted_count !== undefined ? state.redacted_count : (state.pii_count || 0);
                 if (metricMonitored) metricMonitored.textContent = state.monitored_count || 0;
-                log(`[Sanitizer] Blocked ${state.redacted_count || 0} PII entries (Guarding ${state.monitored_count || 0} sensitive inputs). Non-sensitive DOM ready.`);
 
-                // 2. Transmit sanitized payload to Server Reasoning API
-                log(`[Server] Requesting action from ${serverUrl}/api/step...`);
+                log(`[Server] Requesting action for: "${subgoal}"...`);
                 chrome.runtime.sendMessage({
                     action: "SEND_TO_SERVER",
                     serverUrl: serverUrl,
                     payload: {
-                        subgoal: goal,
+                        subgoal: subgoal,
                         elements: state.elements,
                         url: state.url,
                         pii_count: state.pii_count
                     }
                 }, (response) => {
-                    btnStep.disabled = false;
                     if (!response || !response.success) {
                         log(`[Server Error] ${response ? response.error : 'Connection refused. Is server running?'}`);
+                        resolve({ success: false });
                         return;
                     }
 
                     const action = response.action;
                     log(`[Action Planned] ${action.operation} on node [${action.target_index}]: "${action.target_label || action.reasoning || ''}"`);
 
-                    // 3. Command client to execute action
                     chrome.tabs.sendMessage(activeTabId, { action: "EXECUTE_ACTION", payload: action }, (execRes) => {
                         if (execRes && execRes.success) {
                             log(`[Execution] ✓ Completed successfully.`);
+                            resolve({ success: true, action: action });
                         } else {
                             log(`[Execution Failed] ${execRes ? execRes.error : 'Unknown'}`);
+                            resolve({ success: false });
                         }
                     });
                 });
             });
+        });
+    }
+
+    if (btnRun) {
+        btnRun.addEventListener("click", async () => {
+            const goal = goalInput.value.trim();
+            const serverUrl = serverUrlInput.value.trim();
+            if (!goal) return;
+
+            if (_isRunning) {
+                _isRunning = false;
+                btnRun.textContent = "▶ Run Goal";
+                btnStep.disabled = false;
+                log("[Agent] User requested stop.");
+                return;
+            }
+
+            const tabs = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
+            if (!tabs || !tabs[0]) return;
+            const activeTabId = tabs[0].id;
+
+            const subgoals = decomposeGoal(goal);
+            _isRunning = true;
+            btnRun.textContent = "⏹ Stop";
+            btnStep.disabled = true;
+
+            log(`[Orchestrator] Plan established: ${subgoals.length} sequential subgoals.`);
+            for (let i = 0; i < subgoals.length; i++) {
+                log(`  [${i + 1}/${subgoals.length}] -> ${subgoals[i]}`);
+            }
+
+            try {
+                for (let i = 0; i < subgoals.length; i++) {
+                    if (!_isRunning) break;
+                    const currentSubgoal = subgoals[i];
+                    log(`\n=======================================================\n[Orchestrator] Step [${i + 1}/${subgoals.length}]: ${currentSubgoal}\n=======================================================`);
+
+                    const res = await executeSingleStep(currentSubgoal, activeTabId, serverUrl);
+                    if (!res.success) {
+                        log(`[Orchestrator] Step failed. Stopping agent.`);
+                        break;
+                    }
+
+                    if (i < subgoals.length - 1) {
+                        log(`[Orchestrator] Waiting for page mutation/navigation to settle...`);
+                        await new Promise(r => setTimeout(r, 2200));
+                    }
+                }
+            } finally {
+                _isRunning = false;
+                btnRun.textContent = "▶ Run Goal";
+                btnStep.disabled = false;
+                log(`[LiteSight] Autonomous goal execution cycle finished.`);
+            }
+        });
+    }
+
+    btnStep.addEventListener("click", async () => {
+        const goal = goalInput.value.trim();
+        const serverUrl = serverUrlInput.value.trim();
+        if (!goal) return;
+
+        if (_planQueue.length === 0) {
+            _planQueue = decomposeGoal(goal);
+            _totalSteps = _planQueue.length;
+            _currentStepNumber = 0;
+            log(`[Plan] Initialized ${_totalSteps} discrete steps.`);
+        }
+
+        const activeSubgoal = _planQueue.shift();
+        _currentStepNumber++;
+
+        btnStep.disabled = true;
+        log(`\n=======================================================\n[Step ${_currentStepNumber}/${_totalSteps}]: ${activeSubgoal}\n=======================================================`);
+
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+            if (!tabs[0]) {
+                btnStep.disabled = false;
+                return;
+            }
+            const activeTabId = tabs[0].id;
+            await executeSingleStep(activeSubgoal, activeTabId, serverUrl);
+            btnStep.disabled = false;
+
+            if (_planQueue.length > 0) {
+                log(`[Next Step ready]: ${_planQueue[0]} (Click 'Step' to continue)`);
+            } else {
+                log(`[Plan Finished] All ${_totalSteps} steps completed!`);
+            }
         });
     });
 });

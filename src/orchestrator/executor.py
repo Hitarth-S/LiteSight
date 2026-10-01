@@ -447,20 +447,23 @@ class ReactiveExecutor:
                 if extracted_text and extracted_text.lower() in label:
                     score += 6
             elif is_type:
-                if role in ["textbox", "combobox", "searchbox"] or tag in ["input", "textarea"]:
-                    score += 8
+                if role in ["textbox", "searchbox"] or (tag in ["input", "textarea"] and tag != "select"):
+                    score += 10
                     # Extra bonus for search-specific inputs
                     if any(sw in label for sw in ["search", "query", "find", "lookup", "filter", "id", "title"]):
-                        score += 5
+                        score += 8
                     # Extra bonus for auth/credential inputs when requested
                     if any(aw in subgoal_lower for aw in ["user", "username", "email", "login", "id", "account"]) and any(aw in label for aw in ["user", "username", "email", "login", "id", "account"]):
                         score += 8
                     if any(pw in subgoal_lower for pw in ["password", "passcode", "pin", "secret"]) and any(pw in label for pw in ["password", "passcode", "pin", "pass"]):
                         score += 10
+                elif tag == "select" or (role == "combobox" and tag not in ["input", "textarea"]):
+                    # Non-editable dropdowns should NEVER be chosen as text inputs when typing
+                    score -= 15
             elif is_click:
                 if role in ["button", "link"]:
                     score += 3
-                if role == "combobox":
+                if role == "combobox" and not is_type:
                     score += 2
                 # Boost login / sign in / sign up buttons when clicked
                 if any(bw in subgoal_lower for bw in ["login", "log in", "sign in", "signin"]) and any(bw in label for bw in ["login", "log in", "sign in", "signin", "submit"]):
@@ -562,10 +565,10 @@ class ReactiveExecutor:
             target_label = best_candidate.get("label", "")
             target_role = best_candidate.get("role", "").lower()
             target_tag = best_candidate.get("tag", "").lower()
-            is_select_candidate = target_tag == "select" or target_role == "combobox"
+            is_select_candidate = (target_tag == "select" or (target_role == "combobox" and target_tag not in ["input", "textarea"]))
             is_editable = (target_role in ["textbox", "searchbox"] or target_tag in ["input", "textarea"]) and not is_select_candidate
 
-            if is_select_candidate and (is_select or (extracted_text and not is_editable)):
+            if is_select_candidate and (is_select or (extracted_text and not is_editable and not is_type)):
                 final_val = extracted_text
                 if not final_val:
                     for w in words:
@@ -704,8 +707,13 @@ class HighLevelPlanner:
     def _fallback_decompose_goal(self, user_goal: str) -> List[str]:
         if not user_goal:
             return ["locate_search_input", "type_query", "submit"]
-        if "," in user_goal or " and " in user_goal or ";" in user_goal:
-            raw_steps = [c.strip() for c in re.split(r'[,;]\s*|\s+and\s+', user_goal) if c.strip()]
+        if "," in user_goal or " and " in user_goal or ";" in user_goal or " then " in user_goal.lower():
+            raw_steps = [
+                re.sub(r'^(?:and|then)\s+', '', c.strip(), flags=re.IGNORECASE)
+                for c in re.split(r'[,;]\s*|\s+and\s+|\s+then\s+', user_goal)
+                if c.strip()
+            ]
+            raw_steps = [s for s in raw_steps if s]
             is_auth_goal = any(kw in user_goal.lower() for kw in ["login", "log in", "sign in", "signin", "signup", "sign up", "register"])
             has_form_fields = any(any(f in s.lower() for f in ["username", "password", "role", "email", "->", ":", "="]) for s in raw_steps)
             has_explicit_submit = any(any(sub in s.lower() for sub in ["submit", "click login", "click sign", "click register", "press enter"]) for s in raw_steps)
