@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiteSight – Customer KYC Form (Demo)</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      /* Pastel gradient background — indigo tint to sky tint */
+      background: linear-gradient(135deg, #eef2ff 0%, #e0f2fe 60%, #f0fdf4 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    /* ── Card ───────────────────────────────────────────── */
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow:
+        0 2px 8px rgba(0,0,0,.06),
+        0 8px 40px rgba(99,102,241,.10);
+      width: 100%;
+      max-width: 520px;
+      padding: 0 0 40px;
+      overflow: hidden;
+    }
+
+    /* ── Card header — pastel gradient bar ──────────────── */
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 22px 28px 20px;
+      background: linear-gradient(135deg, #6366f1 0%, #38bdf8 100%);
+    }
+    .card-header .logo {
+      width: 42px; height: 42px;
+      background: rgba(255,255,255,0.22);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.28);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 800; font-size: 16px; letter-spacing: -1px;
+      flex-shrink: 0;
+    }
+    .card-header h1 {
+      font-size: 18px; font-weight: 700; color: #fff;
+      line-height: 1.2;
+    }
+    .card-header p {
+      font-size: 12px; color: rgba(255,255,255,0.72); margin-top: 3px;
+    }
+    .badge {
+      margin-left: auto;
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 3px 10px; border-radius: 99px;
+      letter-spacing: .6px;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+
+    /* ── Inner content padding ──────────────────────────── */
+    .card-body { padding: 28px 32px 0; }
+
+    /* ── Section titles ─────────────────────────────────── */
+    .section-title {
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: #94a3b8; margin-bottom: 14px; margin-top: 26px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1; height: 1px; background: #f1f5f9;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+
+    /* ── Form fields ────────────────────────────────────── */
+    .field { margin-bottom: 18px; }
+    label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: #475569; margin-bottom: 6px;
+    }
+    .value-box {
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px; color: #1e293b;
+      font-family: 'Courier New', monospace;
+      letter-spacing: .3px;
+      transition: border-color .15s;
+    }
+    /* Invalid / negative-control fields */
+    .value-box.negative {
+      border-color: #fca5a5;
+      background: #fff5f5;
+      color: #94a3b8;
+    }
+
+    /* ── Tags ───────────────────────────────────────────── */
+    .tag {
+      display: inline-block;
+      font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 4px;
+      margin-left: 6px; vertical-align: middle;
+    }
+    .tag-pii     { background: #fee2e2; color: #991b1b; }
+    .tag-safe    { background: #d1fae5; color: #065f46; }
+    .tag-invalid { background: #fef9c3; color: #854d0e; }
+
+    /* ── Password input ─────────────────────────────────── */
+    input[type="password"] {
+      width: 100%; border: 1.5px solid #e2e8f0;
+      border-radius: 8px; padding: 10px 14px;
+      font-size: 14px; color: #1e293b;
+      background: #f8fafc; outline: none;
+      font-family: monospace;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input[type="password"]:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,.13);
+    }
+
+    /* ── Divider ────────────────────────────────────────── */
+    .divider {
+      border: none; border-top: 1px solid #f1f5f9; margin: 26px 0 0;
+    }
+
+    /* ── Footer note ────────────────────────────────────── */
+    .footer-note {
+      font-size: 11px; color: #94a3b8; text-align: center;
+      margin-top: 28px; padding: 0 8px;
+    }
+    .footer-note span { color: #e11d48; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Card header — pastel gradient -->
+  <div class="card-header">
+    <div class="logo">LS</div>
+    <div>
+      <h1>Customer KYC Form</h1>
+      <p>Verification &amp; Identity Details</p>
+    </div>
+    <span class="badge">DEMO</span>
+  </div>
+
+  <div class="card-body">
+
+    <!-- ── Personal Identity ─────────────────────────── -->
+    <div class="section-title">Personal Identity</div>
+
+    <div class="field">
+      <label>
+        Aadhaar Number
+        <span class="tag tag-pii">PII · Verhoeff-VALID</span>
+      </label>
+      <!--
+        Verhoeff check (node):
+          prefix = "23456789012"  → checkDigit = verhoeffGenerate("23456789012") = 4
+          fullAadhaar = "234567890124"
+          verhoeffCheck("234567890124") === true  ✓
+      -->
+      <div
+        class="value-box"
+        id="aadhaar-valid"
+        data-pii-expected="aadhaar"
+      >2345 6789 0124</div>
+    </div>
+
+    <div class="field">
+      <label>
+        Aadhaar (INVALID – negative control)
+        <span class="tag tag-invalid">Verhoeff-INVALID</span>
+      </label>
+      <!-- 123456789013 fails Verhoeff; must NOT be redacted -->
+      <div
+        class="value-box negative"
+        id="aadhaar-invalid"
+        data-pii-expected="none"
+      >1234 5678 9013</div>
+    </div>
+
+    <div class="field">
+      <label>
+        PAN Number
+        <span class="tag tag-pii">PII</span>
+      </label>
+      <div
+        class="value-box"
+        id="pan-number"
+        data-pii-expected="pan"
+      >ABCDE1234F</div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ── Contact Information ───────────────────────── -->
+    <div class="section-title">Contact Information</div>
+
+    <div class="field">
+      <label>
+        Phone Number (India)
+        <span class="tag tag-pii">PII</span>
+      </label>
+      <div
+        class="value-box"
+        id="phone-number"
+        data-pii-expected="phone"
+      >+91 98765 43210</div>
+    </div>
+
+    <div class="field">
+      <label>
+        Email Address
+        <span class="tag tag-pii">PII</span>
+      </label>
+      <div
+        class="value-box"
+        id="email-address"
+        data-pii-expected="email"
+      >test.user@example.com</div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ── Security ──────────────────────────────────── -->
+    <div class="section-title">Security</div>
+
+    <div class="field">
+      <label>
+        Portal Password
+        <span class="tag tag-pii">PII</span>
+      </label>
+      <input
+        type="password"
+        id="portal-password"
+        data-pii-expected="password"
+        value="Str0ng#Pass99!"
+        autocomplete="off"
+        readonly
+      />
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ── Non-PII Numbers (Precision Demo) ─────────── -->
+    <div class="section-title">Order Reference (Non-PII Negative)</div>
+
+    <div class="field">
+      <label>
+        Order ID
+        <span class="tag tag-safe">NOT PII · Verhoeff-INVALID</span>
+      </label>
+      <!-- 12-digit number that fails Verhoeff – must NOT be redacted -->
+      <div
+        class="value-box negative"
+        id="order-id"
+        data-pii-expected="none"
+      >123456789012</div>
+    </div>
+
+    <div class="footer-note">
+      <span>⚠ FAKE DATA ONLY</span> — generated for LiteSight hackathon demo.
+      No real personal information is present on this page.
+    </div>
+
+  </div><!-- /card-body -->
+
+</div><!-- /card -->
+</body>
+</html>

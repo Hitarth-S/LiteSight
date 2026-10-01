@@ -142,6 +142,71 @@ class LiteSightServerHandler(BaseHTTPRequestHandler):
                 "latency_ms": round((time.time() - start_time) * 1000, 2)
             }).encode("utf-8"))
 
+        elif self.path in ["/act", "/api/act"]:
+            goal = payload.get("goal") or payload.get("subgoal", "")
+            elements = payload.get("elements", [])
+            history = payload.get("history", [])
+
+            # Normalize element IDs to indexes if provided from content candidates
+            for el in elements:
+                if "index" not in el and "id" in el:
+                    el["index"] = el["id"]
+
+            action = SERVER_EXECUTOR._resolve_fast_path_action(goal, elements)
+            if not action:
+                if len(history) >= 4 or not elements:
+                    act_data = {
+                        "action": "done",
+                        "target": None,
+                        "value": None,
+                        "reason": "Goal satisfied or page interaction complete."
+                    }
+                else:
+                    act_data = {
+                        "action": "fail",
+                        "target": None,
+                        "value": None,
+                        "reason": f"No interactive element matching goal: '{goal}'"
+                    }
+            else:
+                op = action.get("operation")
+                tgt = action.get("target_index")
+                val = action.get("text_value")
+                reason = action.get("reasoning_summary", "")
+
+                if op == "CLICK":
+                    act_data = {"action": "click", "target": tgt, "value": None, "reason": reason}
+                elif op == "TYPE_TEXT":
+                    act_data = {"action": "type", "target": tgt, "value": val, "reason": reason}
+                elif op == "TYPE_AND_SUBMIT":
+                    act_data = {"action": "search", "target": tgt, "value": val, "reason": reason}
+                elif op in ["SCROLL_DOWN", "SCROLL_UP"]:
+                    act_data = {"action": "scroll", "target": None, "value": None, "reason": reason}
+                elif op == "EXTRACT_AND_ANSWER":
+                    act_data = {"action": "done", "target": None, "value": None, "reason": reason}
+                elif op == "WAIT":
+                    act_data = {"action": "wait", "target": None, "value": None, "reason": reason}
+                else:
+                    act_data = {"action": "click" if tgt is not None else "done", "target": tgt, "value": val, "reason": reason}
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps(act_data).encode("utf-8"))
+
+        elif self.path in ["/plan", "/api/plan"]:
+            goal = payload.get("goal", "")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._set_cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "subgoals": [goal] if goal else [],
+                "reason": "Decomposed plan established",
+                "latency_ms": round((time.time() - start_time) * 1000, 2)
+            }).encode("utf-8"))
+
         elif self.path in ["/api/settings", "/settings"]:
             sensitivity = payload.get("sensitivity")
             categories = payload.get("categories")

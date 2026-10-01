@@ -6,9 +6,45 @@
  * 
  * Supports configurable sensitivity levels ('relaxed', 'balanced', 'strict')
  * and fine-grained category toggles (credit_cards, passwords, emails, names, phone_numbers, government_ids).
+ * Includes mathematical Verhoeff check-digit validation for Indian Aadhaar and PAN patterns.
  */
 
 (function () {
+    /** Verhoeff tables for Aadhaar check-digit validation */
+    const _V_D = [
+        [0,1,2,3,4,5,6,7,8,9],
+        [1,2,3,4,0,6,7,8,9,5],
+        [2,3,4,0,1,7,8,9,5,6],
+        [3,4,0,1,2,8,9,5,6,7],
+        [4,0,1,2,3,9,5,6,7,8],
+        [5,9,8,7,6,0,4,3,2,1],
+        [6,5,9,8,7,1,0,4,3,2],
+        [7,6,5,9,8,2,1,0,4,3],
+        [8,7,6,5,9,3,2,1,0,4],
+        [9,8,7,6,5,4,3,2,1,0]
+    ];
+    const _V_P = [
+        [0,1,2,3,4,5,6,7,8,9],
+        [1,5,7,6,2,8,3,0,9,4],
+        [5,8,0,3,7,9,6,1,4,2],
+        [8,9,1,6,0,4,3,5,2,7],
+        [9,4,5,3,1,2,6,8,7,0],
+        [4,2,8,6,5,7,3,9,0,1],
+        [2,7,9,3,8,0,6,4,1,5],
+        [7,0,4,6,9,1,3,2,5,8]
+    ];
+
+    function _verhoeffValid(numStr) {
+        const clean = String(numStr).replace(/[\s-]/g, '');
+        if (clean.length !== 12 || !/^\d{12}$/.test(clean)) return false;
+        const digits = clean.split('').reverse().map(Number);
+        let c = 0;
+        for (let i = 0; i < digits.length; i++) {
+            c = _V_D[c][_V_P[i % 8][digits[i]]];
+        }
+        return c === 0;
+    }
+
     class PIIDetector {
         constructor(config = {}) {
             this.webgpuSupported = false;
@@ -107,7 +143,10 @@
                 inputSelectors.push('input[autocomplete*="name"]', 'input[name="name"]', 'input[name="fullname"]', 'input[name="full_name"]', 'input[name="first_name"]', 'input[name="last_name"]', 'input[name="fname"]', 'input[name="lname"]', 'input[id*="fullname"]');
             }
             if (isCatActive('government_ids')) {
-                inputSelectors.push('input[name*="ssn"]', 'input[id*="ssn"]', 'input[name*="tax_id"]', 'input[name*="national_id"]');
+                inputSelectors.push(
+                    'input[name*="ssn"]', 'input[id*="ssn"]', 'input[name*="tax_id"]', 'input[name*="national_id"]',
+                    'input[name*="aadhaar"]', 'input[id*="aadhaar"]', 'input[name*="pan"]', 'input[id*="pan"]'
+                );
             }
             if (sensitivity === 'strict') {
                 inputSelectors.push('.avatar', 'img[alt*="avatar" i]', 'img[src*="avatar" i]', '[data-testid*="avatar"]');
@@ -139,6 +178,12 @@
                     } else if (inputType === "tel" || name.includes("phone") || name.includes("mobile")) {
                         type = "PHONE";
                         categoryLabel = "Phone Number";
+                    } else if (name.includes("aadhaar")) {
+                        type = "AADHAAR";
+                        categoryLabel = "Government ID / Aadhaar";
+                    } else if (name.includes("pan")) {
+                        type = "PAN";
+                        categoryLabel = "Government ID / PAN";
                     } else if (name.includes("name") || name.includes("fname") || name.includes("lname")) {
                         type = "NAME";
                         categoryLabel = "Personal Name";
@@ -173,12 +218,15 @@
                 }
             }
 
-            // 2. Scan leaf text nodes for raw credit cards, emails, SSNs, phone numbers, and names
+            // 2. Scan leaf text nodes for raw credit cards, emails, SSNs, Aadhaar, PAN, phone numbers, and names
             const textNodes = document.querySelectorAll('p, span, td, th, div, label, li, a');
             const ccRegex = /\b(?:\d{4}[ -]?){3}\d{4}\b/;
             const ssnRegex = /\b\d{3}-\d{2}-\d{4}\b/;
+            const aadhaarRegex = /\b(\d{4}[\s-]\d{4}[\s-]\d{4}|\d{12})\b/;
+            const panRegex = /\b[A-Z]{5}\d{4}[A-Z]\b/;
             const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
             const phoneRegex = /\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/;
+            const phoneInRegex = /\+91[\s-]?\d{5}[\s-]?\d{5}\b/;
             const nameLabelRegex = /\b(?:name|customer|user|cardholder|account holder)\s*[:=]\s*([A-Za-z]+(?:\s+[A-Za-z]+)+)/i;
             const strictNameRegex = /\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b/;
             const longNumericRegex = /\b\d{6,}\b/;
@@ -194,13 +242,22 @@
                     if (isCatActive('credit_cards') && ccRegex.test(txt)) {
                         matchedType = "CREDIT_CARD";
                         matchedCategory = "Credit Card / Financial";
+                    } else if (isCatActive('government_ids') && panRegex.test(txt)) {
+                        matchedType = "PAN";
+                        matchedCategory = "Government ID / PAN";
+                    } else if (isCatActive('government_ids') && aadhaarRegex.test(txt)) {
+                        const m = txt.match(aadhaarRegex);
+                        if (m && _verhoeffValid(m[0])) {
+                            matchedType = "AADHAAR";
+                            matchedCategory = "Government ID / Aadhaar";
+                        }
                     } else if (isCatActive('government_ids') && ssnRegex.test(txt)) {
                         matchedType = "GOVERNMENT_ID";
                         matchedCategory = "Government ID / SSN";
                     } else if (isCatActive('emails') && emailRegex.test(txt)) {
                         matchedType = "EMAIL";
                         matchedCategory = "Email Address";
-                    } else if (isCatActive('phone_numbers') && phoneRegex.test(txt)) {
+                    } else if (isCatActive('phone_numbers') && (phoneInRegex.test(txt) || phoneRegex.test(txt))) {
                         matchedType = "PHONE";
                         matchedCategory = "Phone Number";
                     } else if (isCatActive('names') && nameLabelRegex.test(txt)) {

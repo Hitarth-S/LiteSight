@@ -313,7 +313,24 @@
 
     <div class="btn-row">
       <button class="action-btn btn-primary" id="btn-step">Execute Step</button>
+      <button class="action-btn btn-secondary" id="btn-preview">🔒 Preview</button>
       <button class="action-btn btn-secondary" id="btn-hud">Toggle HUD</button>
+    </div>
+
+    <!-- Live Redaction Inspection Panel -->
+    <div id="redactPanel" style="display: none; background: #131b2e; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; overflow: hidden;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: rgba(56, 189, 248, 0.08); border-bottom: 1px solid var(--border);">
+        <span style="font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase;">Original vs Masked Sent</span>
+        <span id="countsLine" style="font-size: 9px; color: var(--muted); background: rgba(255,255,255,0.06); border-radius: 4px; padding: 1px 6px;">—</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border);">
+        <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--muted); padding: 4px 8px; background: rgba(0,0,0,0.25); border-right: 1px solid var(--border);">On Page (DOM)</div>
+        <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--muted); padding: 4px 8px; background: rgba(0,0,0,0.25);">Sent To Server</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr;">
+        <div id="originalCol" style="padding: 6px 8px; max-height: 110px; overflow-y: auto; border-right: 1px solid var(--border); font-family: monospace; font-size: 10px; color: #ef4444;"></div>
+        <div id="sentCol" style="padding: 6px 8px; max-height: 110px; overflow-y: auto; font-family: monospace; font-size: 10px; color: #38bdf8;"></div>
+      </div>
     </div>
 
     <div class="log-box" id="log-console">[LiteSight] Ready. On-Device WebGPU Sentinel guarding context.</div>

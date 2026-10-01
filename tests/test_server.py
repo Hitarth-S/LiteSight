@@ -182,3 +182,47 @@ def test_unclosed_quote_search_and_tab_phrase_resolution():
         assert action_tab["target_index"] != 5  # Must never match 'Open Source'
 
 
+def test_server_verhoeff_and_indian_pii():
+    """
+    Verifies that:
+    1. Authentic Aadhaar numbers passing Verhoeff checksum are redacted.
+    2. Indian PAN cards and +91 phone numbers are redacted.
+    3. Invalid Aadhaar numbers failing Verhoeff checksum (negative controls) are NOT redacted.
+    """
+    sample = (
+        "Valid KYC: Aadhaar 2345 6789 0124, PAN ABCDE1234F, Phone +91 98765 43210. "
+        "Negative controls: Invalid Aadhaar 1234 5678 9013, 123456789012."
+    )
+    sanitized = SERVER_SANITIZER.sanitize_text(sample)
+    assert "[REDACTED_AADHAAR]" in sanitized
+    assert "[REDACTED_PAN]" in sanitized
+    assert "[REDACTED_PHONE]" in sanitized
+    assert "2345 6789 0124" not in sanitized
+    assert "ABCDE1234F" not in sanitized
+    assert "+91 98765 43210" not in sanitized
+
+    # Negative controls must be preserved intact
+    assert "1234 5678 9013" in sanitized
+    assert "123456789012" in sanitized
+
+
+def test_act_endpoint_logic():
+    """
+    Verifies that the /act endpoint payload mapping conforms to extension expectations.
+    """
+    elements = [
+        {"id": 0, "tag": "input", "role": "textbox", "label": "Search products", "value": "", "is_visible": True, "bounding_box": {"x": 100, "y": 100, "width": 200, "height": 30}},
+        {"id": 1, "tag": "button", "role": "button", "label": "Add to Cart", "value": "", "is_visible": True, "bounding_box": {"x": 300, "y": 100, "width": 100, "height": 30}}
+    ]
+    # Standardize element IDs to index
+    for el in elements:
+        if "index" not in el and "id" in el:
+            el["index"] = el["id"]
+
+    action = SERVER_EXECUTOR._resolve_fast_path_action("click Add to Cart", elements)
+    assert action is not None
+    assert action["operation"] == "CLICK"
+    assert action["target_index"] == 1
+
+
+

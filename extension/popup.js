@@ -10,10 +10,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const goalInput = document.getElementById("goal-input");
     const serverUrlInput = document.getElementById("server-url");
     const btnStep = document.getElementById("btn-step");
+    const btnPreview = document.getElementById("btn-preview");
     const btnHud = document.getElementById("btn-hud");
     const logConsole = document.getElementById("log-console");
     const metricPii = document.getElementById("metric-pii");
     const metricMonitored = document.getElementById("metric-monitored");
+
+    // Redaction panel elements
+    const redactPanel = document.getElementById("redactPanel");
+    const countsLine = document.getElementById("countsLine");
+    const originalCol = document.getElementById("originalCol");
+    const sentCol = document.getElementById("sentCol");
+    let _previewActive = false;
 
     // Settings view elements
     const settingSensitivity = document.getElementById("setting-sensitivity");
@@ -171,6 +179,83 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     });
+
+    function _maskDisplay(type, value) {
+        if (type === 'AADHAAR') {
+            const digits = value.replace(/[\s-]/g, '');
+            return '**** **** ' + digits.slice(8);
+        }
+        if (type === 'PAN') {
+            return value.slice(0, 3) + '**' + value.slice(5, 9) + '*';
+        }
+        if (type === 'PHONE') {
+            return '+91 98*** ***' + value.replace(/[\s-]/g, '').slice(-2);
+        }
+        if (type === 'EMAIL') {
+            const atIdx = value.indexOf('@');
+            const local = value.slice(0, atIdx);
+            const domain = value.slice(atIdx + 1);
+            return local[0] + '*'.repeat(Math.max(1, local.length - 1)) + '@' + domain;
+        }
+        if (type === 'PASSWORD') {
+            return '********';
+        }
+        return '***';
+    }
+
+    if (btnPreview) {
+        btnPreview.addEventListener("click", () => {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (!tabs[0]) return;
+                const tabId = tabs[0].id;
+
+                if (_previewActive) {
+                    chrome.tabs.sendMessage(tabId, { type: "RESTORE_PAGE" }, (res) => {
+                        _previewActive = false;
+                        btnPreview.textContent = "🔒 Preview";
+                        if (redactPanel) redactPanel.style.display = "none";
+                        log("[Preview] Page restored to original DOM state.");
+                    });
+                } else {
+                    chrome.tabs.sendMessage(tabId, { type: "PREVIEW_REDACTION" }, (res) => {
+                        if (!res || res.error) {
+                            log(`[Preview Error] ${res ? res.error : 'Failed to trigger preview'}`);
+                            return;
+                        }
+                        _previewActive = true;
+                        btnPreview.textContent = "↩ Restore";
+                        if (redactPanel) redactPanel.style.display = "block";
+
+                        const total = Object.values(res.counts || {}).reduce((a, b) => a + b, 0);
+                        const parts = Object.entries(res.counts || {}).map(([k, v]) => `${k}:${v}`);
+                        if (countsLine) countsLine.textContent = `${total} items (${parts.join(', ')})`;
+
+                        if (originalCol) {
+                            originalCol.textContent = '';
+                            (res.original || []).forEach(item => {
+                                const row = document.createElement('div');
+                                row.style.marginBottom = '4px';
+                                row.textContent = `[${item.field}] ${item.value}`;
+                                originalCol.appendChild(row);
+                            });
+                        }
+
+                        if (sentCol) {
+                            sentCol.textContent = '';
+                            (res.original || []).forEach(item => {
+                                const row = document.createElement('div');
+                                row.style.marginBottom = '4px';
+                                row.textContent = `[${item.field}] ${_maskDisplay(item.field, item.value)}`;
+                                sentCol.appendChild(row);
+                            });
+                        }
+
+                        log(`[Preview] Redaction active: ${total} PII items masked in-place.`);
+                    });
+                }
+            });
+        });
+    }
 
     btnStep.addEventListener("click", async () => {
         const goal = goalInput.value.trim();
