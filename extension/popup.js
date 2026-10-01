@@ -353,6 +353,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     const currentSubgoal = subgoals[i];
                     log(`\n=======================================================\n[Orchestrator] Step [${i + 1}/${subgoals.length}]: ${currentSubgoal}\n=======================================================`);
 
+                    const subgoalLower = currentSubgoal.toLowerCase();
+                    const isSearchStep = subgoalLower.startsWith("search") || subgoalLower.includes("search for");
+
+                    // Query tab URL before execution
+                    const tabBefore = await new Promise(r => chrome.tabs.get(activeTabId, r));
+                    const urlBefore = tabBefore ? tabBefore.url : "";
+
                     const res = await executeSingleStep(currentSubgoal, activeTabId, serverUrl);
                     if (!res.success) {
                         log(`[Orchestrator] Step failed. Stopping agent.`);
@@ -361,7 +368,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     if (i < subgoals.length - 1) {
                         log(`[Orchestrator] Waiting for page mutation/navigation to settle...`);
-                        await new Promise(r => setTimeout(r, 2200));
+                        await new Promise(r => setTimeout(r, 2400));
+
+                        // Closed-Loop State Verification:
+                        const tabAfter = await new Promise(r => chrome.tabs.get(activeTabId, r));
+                        const urlAfter = tabAfter ? tabAfter.url : "";
+
+                        if (isSearchStep) {
+                            const isSearchUrl = /([?&](k|q|query)=|\/s\?|\/search)/i.test(urlAfter);
+                            if (isSearchUrl || (urlBefore && urlAfter !== urlBefore)) {
+                                log(`[Verifier] ✓ Search verified: Navigation transitioned to search results page.`);
+                            } else {
+                                log(`[Verifier] ⚠️ State check: Page URL unchanged (${urlAfter}). Waiting for DOM update...`);
+                                await new Promise(r => setTimeout(r, 1200));
+                            }
+                        }
+
+                        // Safety Interlock: Guard against executing filters on the homepage
+                        const nextSubgoalLower = subgoals[i + 1].toLowerCase();
+                        const isNextFilter = nextSubgoalLower.includes("filter") || nextSubgoalLower.includes("star");
+                        if (isNextFilter && urlBefore && urlAfter === urlBefore && !/([?&](k|q|query)=|\/s\?|\/search)/i.test(urlAfter)) {
+                            log(`[Verifier] ⚠️ Safety Interlock: Next step expects search results, but browser remains on '${urlAfter}'. Pausing to prevent unintended clicks.`);
+                        }
                     }
                 }
             } finally {

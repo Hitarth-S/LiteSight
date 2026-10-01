@@ -219,11 +219,11 @@ class ReactiveExecutor:
             subgoal_clean,
             re.IGNORECASE
         )
-        if assign_match:
+        if assign_match and not any(kw in subgoal_lower for kw in ["add to", "go to", "proceed to", "navigate to", "open "]):
             cand_field = assign_match.group(1).strip()
             cand_val = assign_match.group(2).strip()
             cand_field_lower = cand_field.lower()
-            if not any(act in cand_field_lower for act in ["click", "press", "hit", "scroll", "wait", "button", "link"]):
+            if not any(act in cand_field_lower for act in ["click", "press", "hit", "scroll", "wait", "button", "link", "add", "go", "proceed", "navigate"]):
                 target_field = cand_field
                 extracted_text = cand_val
                 is_assignment = True
@@ -373,6 +373,14 @@ class ReactiveExecutor:
         # Common advertising, footer, and corporate phrases to penalize when selecting content
         ad_or_footer_phrases = self._AD_OR_FOOTER_PHRASES
 
+        has_editable_inputs = any(
+            (el.get("role") in ["textbox", "searchbox"] or el.get("tag") in ["input", "textarea"])
+            and el.get("tag") != "select"
+            and el.get("role") not in ["combobox", "button", "link", "checkbox", "radio"]
+            and (el.get("type") or "").lower() not in ["submit", "button", "checkbox", "radio", "hidden", "reset", "file", "image"]
+            for el in elements if el.get("is_visible", True)
+        )
+
         best_score = -1
         best_candidate = None
 
@@ -386,10 +394,35 @@ class ReactiveExecutor:
             if box.get("x", 0) < -500:
                 continue
 
-            score = 0
-            keyword_hits = 0
+            # Strict JEV-style candidate type partitioning:
             tag = el.get("tag", "").lower()
             role = el.get("role", "").lower()
+            input_type = el.get("type", "").lower()
+
+            if is_type:
+                if has_editable_inputs:
+                    # Text inputs only! Dropdowns, buttons, links, etc. are strictly ineligible
+                    is_editable_input = (
+                        (role in ["textbox", "searchbox"] or tag in ["input", "textarea"])
+                        and tag != "select"
+                        and role not in ["combobox", "button", "link", "checkbox", "radio"]
+                        and input_type not in ["submit", "button", "checkbox", "radio", "hidden", "reset", "file", "image"]
+                    )
+                    if not is_editable_input:
+                        continue
+                else:
+                    # No editable text inputs on page: dropdowns are still ineligible, but navigation links can be clicked
+                    if tag == "select" or (role == "combobox" and tag not in ["input", "textarea"]):
+                        continue
+
+            if is_select:
+                # Dropdowns only! Text inputs and buttons are ineligible
+                is_dropdown = (tag == "select" or role in ["combobox", "listbox"]) and tag not in ["input", "textarea"]
+                if not is_dropdown:
+                    continue
+
+            score = 0
+            keyword_hits = 0
             label = el.get("label", "").lower()
             val = el.get("value", "").lower()
 

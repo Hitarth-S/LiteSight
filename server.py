@@ -14,10 +14,12 @@ from typing import Dict, Any, List
 
 # Import LiteSight executor resolution logic
 from src.orchestrator.executor import ReactiveExecutor
+from src.orchestrator.jev_policy import JevTypedPolicy
 from src.state.sanitizer import StateSanitizer
 
-# Global shared reasoning executor and sanitizer
+# Global shared reasoning executor, JEV policy, and sanitizer
 SERVER_EXECUTOR = ReactiveExecutor(browser_api=None, vision_api=None)
+SERVER_JEV_POLICY = JevTypedPolicy()
 SERVER_SANITIZER = StateSanitizer()
 
 
@@ -109,6 +111,12 @@ class LiteSightServerHandler(BaseHTTPRequestHandler):
 
             # Use server-level ReactiveExecutor instance for action planning
             action = SERVER_EXECUTOR._resolve_fast_path_action(active_subgoal, elements)
+
+            # Fallback to JEV Typed Policy if executor finds no match
+            if not action or action.get("operation") == "WAIT":
+                jev_action = SERVER_JEV_POLICY.decide_action(active_subgoal, elements)
+                if jev_action and jev_action.get("operation") != "WAIT":
+                    action = jev_action
 
             if not action:
                 # Default fallback action

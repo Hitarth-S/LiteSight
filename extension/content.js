@@ -455,6 +455,13 @@
             label = label.replace(/\s+/g, ' ').trim().substring(0, 100);
             let value = isSensitive ? "[REDACTED_PII]" : (el.value || "");
 
+            const inViewport = (
+                rect.top < (window.innerHeight || document.documentElement.clientHeight) &&
+                rect.bottom > 0 &&
+                rect.left < (window.innerWidth || document.documentElement.clientWidth) &&
+                rect.right > 0
+            );
+
             sanitizedElements.push({
                 index: index,
                 id: index,
@@ -465,6 +472,7 @@
                 value: value,
                 is_sensitive: isSensitive,
                 is_visible: true,
+                in_viewport: inViewport,
                 x: Math.round(rect.left + rect.width / 2),
                 y: Math.round(rect.top + rect.height / 2),
                 bounding_box: {
@@ -583,10 +591,26 @@
 
                 if (operation === "TYPE_AND_SUBMIT") {
                     await new Promise(r => setTimeout(r, 200));
-                    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
-                    targetEl.dispatchEvent(enterEvent);
+                    // 1. Dispatch full keyboard Enter cycle
+                    ['keydown', 'keypress', 'keyup'].forEach(type => {
+                        targetEl.dispatchEvent(new KeyboardEvent(type, {
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true,
+                            cancelable: true
+                        }));
+                    });
+
+                    // 2. Locate and click associated submit button if present (Amazon #nav-search-submit-button, etc.)
                     const form = targetEl.closest('form');
-                    if (form && typeof form.requestSubmit === 'function') {
+                    const submitBtn = (form && form.querySelector('input[type="submit"], button[type="submit"], #nav-search-submit-button, [aria-label*="search" i], [title*="search" i]')) ||
+                        document.querySelector('#nav-search-submit-button, input[type="submit"].nav-input');
+
+                    if (submitBtn) {
+                        try { submitBtn.click(); } catch (_) {}
+                    } else if (form && typeof form.requestSubmit === 'function') {
                         try { form.requestSubmit(); } catch (_) {}
                     }
                 }
