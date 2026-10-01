@@ -126,10 +126,6 @@ class BrowserEngine:
             await new_page.wait_for_load_state("domcontentloaded", timeout=10000)
         except (pw.Error, TimeoutError, Exception):
             pass
-        try:
-            await new_page.evaluate("() => { if (window.LiteSightInspector) window.LiteSightInspector.mount(); }")
-        except (pw.Error, Exception):
-            pass
 
     async def navigate(self, url: str):
         """Navigates to URL and waits for dynamic client redirects/reloads to settle."""
@@ -156,10 +152,6 @@ class BrowserEngine:
             await asyncio.sleep(0.5)
 
         await asyncio.sleep(1.0)
-        try:
-            await self.page.evaluate("() => { if (window.LiteSightInspector) window.LiteSightInspector.mount(); }")
-        except (pw.Error, AttributeError):
-            pass
 
     async def get_indexed_dom_state(self, retries: int = 3) -> Dict[str, Any]:
         """

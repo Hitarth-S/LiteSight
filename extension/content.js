@@ -559,9 +559,12 @@
 
             if (operation === "CLICK") {
                 targetEl.focus();
+                await new Promise(r => setTimeout(r, 250)); // Deliberate focus pacing matching CLI
                 targetEl.click();
+                await new Promise(r => setTimeout(r, 350)); // Settle pause after click
             } else if (operation === "SELECT") {
                 targetEl.focus();
+                await new Promise(r => setTimeout(r, 200));
                 const val = (textValue || "").trim().toLowerCase();
                 let matched = false;
                 if (targetEl.options && targetEl.options.length > 0) {
@@ -583,14 +586,29 @@
                 } else {
                     targetEl.click();
                 }
+                await new Promise(r => setTimeout(r, 250));
             } else if (operation === "TYPE_TEXT" || operation === "TYPE_AND_SUBMIT") {
                 targetEl.focus();
-                targetEl.value = textValue || "";
+                await new Promise(r => setTimeout(r, 150)); // Focus yield matching CLI
+                targetEl.value = "";
                 targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+
+                // Human-paced typing delay matching CLI (delay=65ms per character)
+                const fullText = textValue || "";
+                for (let i = 0; i < fullText.length; i++) {
+                    const char = fullText[i];
+                    targetEl.value += char;
+                    targetEl.dispatchEvent(new KeyboardEvent('keydown', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true }));
+                    targetEl.dispatchEvent(new KeyboardEvent('keypress', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true }));
+                    targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    targetEl.dispatchEvent(new KeyboardEvent('keyup', { key: char, code: `Key${char.toUpperCase()}`, bubbles: true }));
+                    await new Promise(r => setTimeout(r, 65)); // 65ms per character matches CLI delay=65
+                }
                 targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+                await new Promise(r => setTimeout(r, 150)); // Brief pause before enter/submit
 
                 if (operation === "TYPE_AND_SUBMIT") {
-                    await new Promise(r => setTimeout(r, 200));
+                    await new Promise(r => setTimeout(r, 250));
                     // 1. Dispatch full keyboard Enter cycle
                     ['keydown', 'keypress', 'keyup'].forEach(type => {
                         targetEl.dispatchEvent(new KeyboardEvent(type, {
@@ -613,6 +631,7 @@
                     } else if (form && typeof form.requestSubmit === 'function') {
                         try { form.requestSubmit(); } catch (_) {}
                     }
+                    await new Promise(r => setTimeout(r, 400));
                 }
             }
 
